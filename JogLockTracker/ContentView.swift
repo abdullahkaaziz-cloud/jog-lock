@@ -33,7 +33,11 @@ struct ContentView: View {
                     comparisonCard
 
                     if !tracker.isActive {
+                        modePicker
                         targetStepper
+                        if tracker.mode == .treadmill {
+                            treadmillCard
+                        }
                     }
 
                     controlButton
@@ -93,7 +97,7 @@ struct ContentView: View {
             }
             return "Getting GPS…"
         case .tracking:
-            return "Tracking - go!"
+            return tracker.runMode == .treadmill ? "Counting steps - keep the phone on you" : "Tracking - go!"
         case .paused:
             return "Paused - standing still"
         }
@@ -114,13 +118,18 @@ struct ContentView: View {
                 StatTile(title: "Time", value: elapsedText(at: context.date))
             }
             StatTile(title: "Pace /km", value: paceText)
-            StatTile(title: "GPS accuracy", value: accuracyText)
+            if tracker.isActive && tracker.runMode == .treadmill {
+                StatTile(title: "Steps/min", value: tracker.lastCadence.map { "\(Int(($0 * 60).rounded()))" } ?? "--")
+            } else {
+                StatTile(title: "GPS accuracy", value: accuracyText)
+            }
         }
     }
 
     private var comparisonCard: some View {
         let s = tracker.snapshot
         let g = tracker.gateTotals
+        let treadmillRun = tracker.runMode == .treadmill && (tracker.isActive || tracker.lastFinishedRun != nil)
         return VStack(alignment: .leading, spacing: 10) {
             Text("Distance")
                 .font(.headline)
@@ -132,11 +141,14 @@ struct ContentView: View {
                 CompareRow(label: "Not counted: too few steps", meters: g.noStepsMeters, emphasised: false)
             }
             if g.vehicleMeters > 0 {
-                CompareRow(label: "Not counted: car or bike", meters: g.vehicleMeters, emphasised: false)
+                CompareRow(label: treadmillRun ? "Not counted: car, bike or still" : "Not counted: car or bike",
+                           meters: g.vehicleMeters, emphasised: false)
             }
-            Divider()
-            CompareRow(label: "GPS, cleaned", meters: s.cleanMeters, emphasised: false)
-            CompareRow(label: "GPS, raw", meters: s.rawMeters, emphasised: false)
+            if !treadmillRun {
+                Divider()
+                CompareRow(label: "GPS, cleaned", meters: s.cleanMeters, emphasised: false)
+                CompareRow(label: "GPS, raw", meters: s.rawMeters, emphasised: false)
+            }
             Divider()
             HStack {
                 Text("Steps")
@@ -146,18 +158,20 @@ struct ContentView: View {
                     .monospacedDigit()
             }
             .font(.footnote)
-            HStack {
-                Text("GPS fixes")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("\(s.fixCount) received · \(droppedCount(s)) dropped")
-                    .monospacedDigit()
-            }
-            .font(.footnote)
-            if !s.rejected.isEmpty {
-                Text(droppedBreakdown(s))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            if !treadmillRun {
+                HStack {
+                    Text("GPS fixes")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(s.fixCount) received · \(droppedCount(s)) dropped")
+                        .monospacedDigit()
+                }
+                .font(.footnote)
+                if !s.rejected.isEmpty {
+                    Text(droppedBreakdown(s))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding()
@@ -232,10 +246,43 @@ struct ContentView: View {
     }
 
     static func lastRunLine(_ run: RunSummary) -> String {
+        if run.mode == .treadmill {
+            return "\(Format.km((run.countedMeters ?? 0) / 1000)) km counted · treadmill"
+        }
         guard let counted = run.countedMeters else {
             return "\(Format.km(run.cleanMeters / 1000)) km cleaned · \(Format.km(run.rawMeters / 1000)) raw"
         }
         return "\(Format.km(counted / 1000)) km counted · \(Format.km(run.cleanMeters / 1000)) km GPS"
+    }
+
+    private var modePicker: some View {
+        Picker("Where", selection: $tracker.mode) {
+            Text("Outdoor (GPS)").tag(RunMode.outdoor)
+            Text("Treadmill").tag(RunMode.treadmill)
+        }
+        .pickerStyle(.segmented)
+    }
+
+    private var treadmillCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Keep the phone on you", systemImage: "figure.run")
+                .font(.headline)
+            Text("Put it in a pocket or an armband. On the treadmill's console it can't count your steps.")
+            Text(strideText)
+        }
+        .font(.footnote)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private var strideText: String {
+        guard let model = tracker.strideModel else {
+            return "Distance comes from the iPhone's own step estimate until you've done an outdoor run with Jog Lock. Then it uses your own stride."
+        }
+        let typical = (model.minCadence + model.maxCadence) / 2
+        let length = model.stepLength(cadence: typical)
+        return "Your stride, learned on GPS runs: \(String(format: "%.2f", length)) m a step at \(Int((typical * 60).rounded())) steps a minute."
     }
 
     private var howToCard: some View {

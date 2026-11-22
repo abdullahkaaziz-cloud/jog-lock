@@ -72,13 +72,18 @@ struct RunDetailView: View {
     var body: some View {
         Form {
             Section("Distance") {
-                if let counted = run.countedMeters {
-                    distanceRow("Counted (steps checked)", counted)
-                    distanceRow("Not counted: too few steps", run.noStepsMeters ?? 0)
-                    distanceRow("Not counted: car or bike", run.vehicleMeters ?? 0)
+                if run.mode == .treadmill {
+                    distanceRow("Counted (treadmill)", run.countedMeters ?? 0)
+                    distanceRow("Not counted: car, bike or still", run.rejectedMeters ?? 0)
+                } else {
+                    if let counted = run.countedMeters {
+                        distanceRow("Counted (steps checked)", counted)
+                        distanceRow("Not counted: too few steps", run.noStepsMeters ?? 0)
+                        distanceRow("Not counted: car or bike", run.vehicleMeters ?? 0)
+                    }
+                    distanceRow("GPS, cleaned", run.cleanMeters)
+                    distanceRow("GPS, raw", run.rawMeters)
                 }
-                distanceRow("GPS, cleaned", run.cleanMeters)
-                distanceRow("GPS, raw", run.rawMeters)
                 if let steps = run.steps {
                     LabeledContent("Steps", value: "\(steps)")
                 }

@@ -78,6 +78,16 @@ final class MotionTracker {
             }
         }
     }
+
+    /// Core Motion's activities between two times (it keeps the last 7 days).
+    func activities(from start: Date, to end: Date) async -> [MotionSample] {
+        guard CMMotionActivityManager.isActivityAvailable(), end > start else { return [] }
+        return await withCheckedContinuation { continuation in
+            activityManager.queryActivityStarting(from: start, to: end, to: OperationQueue.main) { activities, _ in
+                continuation.resume(returning: (activities ?? []).map(MotionSample.init))
+            }
+        }
+    }
 }
 
 extension MotionSample {

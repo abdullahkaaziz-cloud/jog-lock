@@ -13,6 +13,8 @@ import Foundation
 public struct RunCounter: Sendable {
     public private(set) var engine: DistanceEngine
     public private(set) var gate: StepGate
+    /// Every piece of distance the engine counted, in order.
+    public private(set) var segments: [CountedSegment] = []
 
     public init(start: TimeInterval,
                 settings: EngineSettings = .standard,
@@ -49,6 +51,7 @@ public struct RunCounter: Sendable {
     private mutating func countLastSegment() {
         if let seg = engine.lastSegment {
             gate.addDistance(seg.meters, from: seg.start, to: seg.end)
+            segments.append(seg)
         }
     }
 

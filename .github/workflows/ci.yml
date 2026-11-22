@@ -35,6 +35,7 @@ jobs:
         run: |
           python Tools/test_engine.py
           python Tools/test_stepgate.py
+          python Tools/test_treadmill.py
 
   core:
     name: Core package tests (Linux)

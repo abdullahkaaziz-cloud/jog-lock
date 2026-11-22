@@ -43,6 +43,14 @@ final class RunTracker: NSObject, ObservableObject {
     @Published var targetKm: Double {
         didSet { UserDefaults.standard.set(targetKm, forKey: Keys.targetKm) }
     }
+    /// The mode the next run starts in.
+    @Published var mode: RunMode {
+        didSet { UserDefaults.standard.set(mode.rawValue, forKey: Keys.mode) }
+    }
+    /// The mode of the current run, or of the last one once it has ended.
+    @Published private(set) var runMode: RunMode = .outdoor
+    @Published private(set) var strideModel: StrideModel?
+    @Published private(set) var lastCadence: Double?
 
     /// True from tapping Start until the run is stopped.
     var isActive: Bool { status != .idle }
@@ -52,10 +60,13 @@ final class RunTracker: NSObject, ObservableObject {
         static let activeRunID = "activeRunID"
         static let activeRunStart = "activeRunStart"
         static let activeRunTarget = "activeRunTarget"
+        static let activeRunMode = "activeRunMode"
+        static let mode = "runMode"
     }
 
     private let manager = CLLocationManager()   // only used for permission prompts
     private var counter = RunCounter(start: 0)
+    private var treadmill: TreadmillCounter?
     private let motion = MotionTracker()
     private var isStopping = false
     private var countedTargetAt: Date?
@@ -73,10 +84,12 @@ final class RunTracker: NSObject, ObservableObject {
     private override init() {
         let saved = UserDefaults.standard.double(forKey: Keys.targetKm)
         targetKm = saved > 0 ? saved : 1.0
+        mode = RunMode(rawValue: UserDefaults.standard.string(forKey: Keys.mode) ?? "") ?? .outdoor
         super.init()
         manager.delegate = self
         observeAppState()
         resumeIfNeeded()
+        loadStrideModel()
     }
 
     // MARK: - Start / stop
@@ -108,14 +121,30 @@ final class RunTracker: NSObject, ObservableObject {
         let end = Date()
         if let start = startedAt, let totals = await motion.totals(from: start, to: end) {
             let sample = StepSample(t: end.timeIntervalSince1970, steps: totals.steps)
-            counter.addSteps(sample)
+            if treadmill != nil {
+                treadmill?.addSteps(sample, pedMeters: totals.meters)
+            } else {
+                counter.addSteps(sample)
+            }
             pedometerMeters = totals.meters
             writeSteps(sample, meters: totals.meters, cadence: nil, detail: "final")
         }
+        if treadmill != nil, let start = startedAt {
+            // Live activity updates stop while the app is in the background,
+            // so fill in the whole run from Core Motion's history.
+            for sample in await motion.activities(from: start, to: end) where addMotion(sample) {
+                writeMotion(sample)
+            }
+        }
         motion.stop()
-        counter.finish()
-        snapshot = counter.engine.snapshot
-        gateTotals = counter.gate.totals
+        if treadmill != nil {
+            treadmill?.finish()
+            gateTotals = treadmill?.totals ?? GateTotals()
+        } else {
+            counter.finish()
+            snapshot = counter.engine.snapshot
+            gateTotals = counter.gate.totals
+        }
         checkTargets(at: end, notifyUser: false)
         logEvent("stop", totals: true)
         writer?.close()
@@ -124,6 +153,9 @@ final class RunTracker: NSObject, ObservableObject {
         let summary = makeSummary(id: id, endedAt: end)
         try? RunStore.onDevice.save(summary)
         lastFinishedRun = summary
+        if runMode == .outdoor {
+            learnStride(fromRun: id)
+        }
 
         clearActiveRun()
         runID = nil
@@ -137,18 +169,21 @@ final class RunTracker: NSObject, ObservableObject {
     }
 
     private func startRun() async {
-        guard await ensureLocationAuthorization() else {
-            status = .idle
-            warning = "Location access is off. Allow it in Settings > Privacy & Security > Location Services > Jog Tracker."
-            return
-        }
-        guard status == .requestingPermission else { return } // stopped while asking
+        let newMode = mode
+        if newMode == .outdoor {
+            guard await ensureLocationAuthorization() else {
+                status = .idle
+                warning = "Location access is off. Allow it in Settings > Privacy & Security > Location Services > Jog Tracker."
+                return
+            }
+            guard status == .requestingPermission else { return } // stopped while asking
 
-        if manager.accuracyAuthorization == .reducedAccuracy {
-            try? await manager.requestTemporaryFullAccuracyAuthorization(withPurposeKey: "RunDistance")
-        }
-        if manager.accuracyAuthorization == .reducedAccuracy {
-            warning = "Precise Location is off, so distances will be wrong. Turn it on in Settings > Jog Tracker > Location."
+            if manager.accuracyAuthorization == .reducedAccuracy {
+                try? await manager.requestTemporaryFullAccuracyAuthorization(withPurposeKey: "RunDistance")
+            }
+            if manager.accuracyAuthorization == .reducedAccuracy {
+                warning = "Precise Location is off, so distances will be wrong. Turn it on in Settings > Jog Tracker > Location."
+            }
         }
         _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
         guard status == .requestingPermission else { return }
@@ -171,9 +206,18 @@ final class RunTracker: NSObject, ObservableObject {
         let now = Date()
         runID = id
         runTargetKm = targetKm
+        runMode = newMode
         counter = RunCounter(start: now.timeIntervalSince1970)
         snapshot = counter.engine.snapshot
-        gateTotals = counter.gate.totals
+        if newMode == .treadmill {
+            let counting = TreadmillCounter(start: now.timeIntervalSince1970, model: strideModel)
+            treadmill = counting
+            gateTotals = counting.totals
+        } else {
+            treadmill = nil
+            gateTotals = counter.gate.totals
+        }
+        lastCadence = nil
         startedAt = now
         countedTargetReached = false
         countedTargetAt = nil
@@ -189,10 +233,15 @@ final class RunTracker: NSObject, ObservableObject {
         defaults.set(id, forKey: Keys.activeRunID)
         defaults.set(now.timeIntervalSince1970, forKey: Keys.activeRunStart)
         defaults.set(runTargetKm, forKey: Keys.activeRunTarget)
+        defaults.set(newMode.rawValue, forKey: Keys.activeRunMode)
 
         writeHeader(at: now)
         logEvent("start")
-        beginUpdates()
+        if newMode == .outdoor {
+            beginUpdates()
+        } else {
+            status = .tracking
+        }
         startMotion(from: now)
     }
 
@@ -264,17 +313,30 @@ final class RunTracker: NSObject, ObservableObject {
 
     private func handleSteps(_ sample: StepSample, meters: Double?, cadence: Double?) {
         guard runID != nil, !isStopping else { return }
-        counter.addSteps(sample)
-        gateTotals = counter.gate.totals
+        if treadmill != nil {
+            treadmill?.addSteps(sample, pedMeters: meters)
+            gateTotals = treadmill?.totals ?? GateTotals()
+        } else {
+            counter.addSteps(sample)
+            gateTotals = counter.gate.totals
+        }
+        lastCadence = cadence
         writeSteps(sample, meters: meters, cadence: cadence, detail: nil)
         checkTargets(at: Date(timeIntervalSince1970: sample.t), notifyUser: true)
     }
 
     private func handleMotion(_ sample: MotionSample) {
         guard runID != nil, !isStopping else { return }
-        if counter.addMotion(sample) {
+        if addMotion(sample) {
             writeMotion(sample)
         }
+    }
+
+    private func addMotion(_ sample: MotionSample) -> Bool {
+        if treadmill != nil {
+            return treadmill?.addMotion(sample) ?? false
+        }
+        return counter.addMotion(sample)
     }
 
     private func noteDiagnostics(_ update: CLLocationUpdate) {
@@ -356,7 +418,9 @@ final class RunTracker: NSObject, ObservableObject {
         runTargetKm = target > 0 ? target : targetKm
         let runStart = Date(timeIntervalSince1970: start)
         startedAt = runStart
+        runMode = RunMode(rawValue: defaults.string(forKey: Keys.activeRunMode) ?? "") ?? .outdoor
         counter = RunCounter.replaying(lines)
+        treadmill = runMode == .treadmill ? TreadmillCounter.replaying(lines) : nil
         countedTargetAt = Self.targetTime(in: lines, kind: "counted")
         cleanTargetAt = Self.targetTime(in: lines, kind: "clean")
         speedTargetAt = Self.targetTime(in: lines, kind: "speed")
@@ -364,7 +428,7 @@ final class RunTracker: NSObject, ObservableObject {
         cleanTargetReached = cleanTargetAt != nil
         speedTargetReached = speedTargetAt != nil
         snapshot = counter.engine.snapshot
-        gateTotals = counter.gate.totals
+        gateTotals = treadmill?.totals ?? counter.gate.totals
         runID = id
         writer = try? RunLogWriter(url: RunStore.onDevice.rawLogURL(for: id))
 
@@ -377,8 +441,28 @@ final class RunTracker: NSObject, ObservableObject {
         }
         logEvent("resumed")
         warning = "Resumed a run that iOS interrupted."
-        beginUpdates()
+        if runMode == .outdoor {
+            beginUpdates()
+        } else {
+            status = .tracking
+        }
         startMotion(from: runStart)
+    }
+
+    // MARK: - Stride model (treadmill mode)
+
+    private func loadStrideModel() {
+        Task { [weak self] in
+            let model = await StrideStore.shared.loadOrBackfill(from: RunStore.onDevice)
+            self?.strideModel = model
+        }
+    }
+
+    private func learnStride(fromRun id: String) {
+        Task { [weak self] in
+            let model = await StrideStore.shared.learn(fromRun: id, in: RunStore.onDevice)
+            self?.strideModel = model
+        }
     }
 
     private static func targetTime(in lines: [LogLine], kind: String) -> Date? {
@@ -391,6 +475,7 @@ final class RunTracker: NSObject, ObservableObject {
         defaults.removeObject(forKey: Keys.activeRunID)
         defaults.removeObject(forKey: Keys.activeRunStart)
         defaults.removeObject(forKey: Keys.activeRunTarget)
+        defaults.removeObject(forKey: Keys.activeRunMode)
     }
 
     // MARK: - Logging
@@ -402,8 +487,14 @@ final class RunTracker: NSObject, ObservableObject {
         line.device = Self.deviceModel
         line.os = UIDevice.current.systemVersion
         line.app = Self.appVersion
-        line.settings = counter.engine.settings
-        line.gate = counter.gate.settings
+        line.mode = runMode
+        if let treadmill {
+            line.stride = treadmill.model
+            line.treadmill = treadmill.settings
+        } else {
+            line.settings = counter.engine.settings
+            line.gate = counter.gate.settings
+        }
         line.targetKm = runTargetKm
         writer?.write(line)
     }
@@ -456,9 +547,13 @@ final class RunTracker: NSObject, ObservableObject {
             line.speedDist = snapshot.speedMeters
             line.raw = snapshot.rawMeters
             line.counted = gateTotals.countedMeters
-            line.noSteps = gateTotals.noStepsMeters
-            line.vehicle = gateTotals.vehicleMeters
             line.steps = gateTotals.steps
+            if treadmill != nil {
+                line.rejected = gateTotals.vehicleMeters
+            } else {
+                line.noSteps = gateTotals.noStepsMeters
+                line.vehicle = gateTotals.vehicleMeters
+            }
         }
         writer?.write(line)
     }
@@ -508,11 +603,13 @@ final class RunTracker: NSObject, ObservableObject {
                    trueKm: nil,
                    note: nil,
                    countedMeters: gateTotals.countedMeters,
-                   noStepsMeters: gateTotals.noStepsMeters,
-                   vehicleMeters: gateTotals.vehicleMeters,
+                   noStepsMeters: runMode == .outdoor ? gateTotals.noStepsMeters : nil,
+                   vehicleMeters: runMode == .outdoor ? gateTotals.vehicleMeters : nil,
                    countedTargetAt: countedTargetAt,
                    steps: gateTotals.steps,
-                   pedometerMeters: pedometerMeters)
+                   pedometerMeters: pedometerMeters,
+                   mode: runMode,
+                   rejectedMeters: runMode == .treadmill ? gateTotals.vehicleMeters : nil)
     }
 
     static var deviceModel: String {
