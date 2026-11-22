@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Checks for the distance engine using simulated runs.
 
-  python3 test_engine.py
+python3 test_engine.py
 """
+
 from __future__ import annotations
 
 import json
@@ -25,8 +26,11 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 
 
 def to_fixes(lines):
-    return [Fix(ln["t"], ln["lat"], ln["lon"], ln["hAcc"], ln["speed"], ln["speedAcc"], ln["stationary"])
-            for ln in lines if ln["type"] == "fix"]
+    return [
+        Fix(ln["t"], ln["lat"], ln["lon"], ln["hAcc"], ln["speed"], ln["speedAcc"], ln["stationary"])
+        for ln in lines
+        if ln["type"] == "fix"
+    ]
 
 
 def run(kind, seed=1, settings=None):
@@ -68,12 +72,21 @@ def test_track_accuracy():
         speed_errs.append((e.speed_dist - true_m) / true_m * 100)
     mean = sum(errs) / len(errs)
     worst = max(errs, key=abs)
-    check("clean on a 1 km track run: mean within ±2.5%, every run within ±5% (20 seeds)",
-          abs(mean) < 2.5 and all(abs(x) < 5 for x in errs), f"mean {mean:+.2f}%, worst {worst:+.2f}%")
-    check("speed-based within ±2% on the track", all(abs(x) < 2 for x in speed_errs),
-          f"mean {sum(speed_errs) / len(speed_errs):+.2f}%")
-    check("raw over-counts more than clean", sum(raw_errs) / len(raw_errs) > mean,
-          f"raw mean {sum(raw_errs) / len(raw_errs):+.2f}%")
+    check(
+        "clean on a 1 km track run: mean within ±2.5%, every run within ±5% (20 seeds)",
+        abs(mean) < 2.5 and all(abs(x) < 5 for x in errs),
+        f"mean {mean:+.2f}%, worst {worst:+.2f}%",
+    )
+    check(
+        "speed-based within ±2% on the track",
+        all(abs(x) < 2 for x in speed_errs),
+        f"mean {sum(speed_errs) / len(speed_errs):+.2f}%",
+    )
+    check(
+        "raw over-counts more than clean",
+        sum(raw_errs) / len(raw_errs) > mean,
+        f"raw mean {sum(raw_errs) / len(raw_errs):+.2f}%",
+    )
 
 
 def test_slow_jog():
@@ -81,8 +94,11 @@ def test_slow_jog():
     for seed in range(1, 11):
         e, _, true_m = run("slow", seed)
         errs.append((e.clean - true_m) / true_m * 100)
-    check("slow jog (2.2 m/s) within ±4%", all(abs(x) < 4 for x in errs),
-          f"mean {sum(errs) / len(errs):+.2f}%, worst {max(errs, key=abs):+.2f}%")
+    check(
+        "slow jog (2.2 m/s) within ±4%",
+        all(abs(x) < 4 for x in errs),
+        f"mean {sum(errs) / len(errs):+.2f}%, worst {max(errs, key=abs):+.2f}%",
+    )
 
 
 def test_streets():
@@ -92,9 +108,11 @@ def test_streets():
         errs.append((e.clean - true_m) / true_m * 100)
         spd.append((e.speed_dist - true_m) / true_m * 100)
     mean = sum(errs) / len(errs)
-    check("street grid (90° turn every 120 m): mean within ±2.5%, every run within ±5%",
-          abs(mean) < 2.5 and all(abs(x) < 5 for x in errs),
-          f"clean mean {mean:+.2f}%, worst {max(errs, key=abs):+.2f}%, speed mean {sum(spd) / len(spd):+.2f}%")
+    check(
+        "street grid (90° turn every 120 m): mean within ±2.5%, every run within ±5%",
+        abs(mean) < 2.5 and all(abs(x) < 5 for x in errs),
+        f"clean mean {mean:+.2f}%, worst {max(errs, key=abs):+.2f}%, speed mean {sum(spd) / len(spd):+.2f}%",
+    )
 
 
 def test_stop_adds_little():
@@ -123,9 +141,11 @@ def test_stop_with_update_pause():
         errs.append((e.clean - true_m) / true_m * 100)
         lost_resume += dec.count("drift")
     mean = sum(errs) / len(errs)
-    check("stop with paused updates: resume movement still counted",
-          abs(mean) < 2.5 and all(abs(x) < 5 for x in errs) and lost_resume == 0,
-          f"mean {sum(errs) / len(errs):+.2f}%, drift decisions {lost_resume}")
+    check(
+        "stop with paused updates: resume movement still counted",
+        abs(mean) < 2.5 and all(abs(x) < 5 for x in errs) and lost_resume == 0,
+        f"mean {sum(errs) / len(errs):+.2f}%, drift decisions {lost_resume}",
+    )
 
 
 def test_standstill():
@@ -156,9 +176,11 @@ def test_urban():
         errs.append((e.clean - true_m) / true_m * 100)
         raw_errs.append((e.raw - true_m) / true_m * 100)
     mean, raw_mean = sum(errs) / len(errs), sum(raw_errs) / len(raw_errs)
-    check("urban (very noisy, 25 s dropout): mean within ±10% and far better than raw",
-          abs(mean) < 10 and raw_mean > 2 * mean,
-          f"clean mean {mean:+.2f}%, worst {max(errs, key=abs):+.2f}%, raw mean {raw_mean:+.2f}%")
+    check(
+        "urban (very noisy, 25 s dropout): mean within ±10% and far better than raw",
+        abs(mean) < 10 and raw_mean > 2 * mean,
+        f"clean mean {mean:+.2f}%, worst {max(errs, key=abs):+.2f}%, raw mean {raw_mean:+.2f}%",
+    )
 
 
 def test_drive_counts_nothing():
@@ -219,8 +241,16 @@ def test_replay_parity_roundtrip():
             ln = dict(ln, decision=dec, clean=e.clean, speedDist=e.speed_dist, raw=e.raw)
         out.append(ln)
     e.finalize()
-    out.append({"type": "event", "t": out[-1]["t"] + 1, "name": "stop",
-                "clean": e.clean, "speedDist": e.speed_dist, "raw": e.raw})
+    out.append(
+        {
+            "type": "event",
+            "t": out[-1]["t"] + 1,
+            "name": "stop",
+            "clean": e.clean,
+            "speedDist": e.speed_dist,
+            "raw": e.raw,
+        }
+    )
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "raw.jsonl")
         with open(p, "w") as fh:
@@ -232,11 +262,23 @@ def test_replay_parity_roundtrip():
 
 
 if __name__ == "__main__":
-    for fn in [test_geometry, test_track_accuracy, test_slow_jog, test_streets, test_stop_adds_little,
-               test_stop_with_update_pause, test_standstill,
-               test_outliers, test_urban, test_drive_counts_nothing, test_warmup_gate,
-               test_out_of_order_and_duplicates, test_gap_not_bridged, test_finalize_tail,
-               test_replay_parity_roundtrip]:
+    for fn in [
+        test_geometry,
+        test_track_accuracy,
+        test_slow_jog,
+        test_streets,
+        test_stop_adds_little,
+        test_stop_with_update_pause,
+        test_standstill,
+        test_outliers,
+        test_urban,
+        test_drive_counts_nothing,
+        test_warmup_gate,
+        test_out_of_order_and_duplicates,
+        test_gap_not_bridged,
+        test_finalize_tail,
+        test_replay_parity_roundtrip,
+    ]:
         fn()
     print()
     print("All checks passed." if FAILED == 0 else f"{FAILED} check(s) failed.")

@@ -9,6 +9,7 @@ this only checks that the logic behaves sensibly.
   python3 simulate.py track --out sim_track.jsonl
   python3 simulate.py --list
 """
+
 from __future__ import annotations
 
 import argparse
@@ -20,7 +21,7 @@ from dataclasses import dataclass
 from replay import WGS84_A, WGS84_E2, Settings, settings_to_swift_dict
 
 REF_LAT, REF_LON = 51.5000, -0.1200  # arbitrary reference point
-T0 = 1_763_830_000.0                 # arbitrary start time (unix seconds)
+T0 = 1_763_830_000.0  # arbitrary start time (unix seconds)
 
 # Standard 400 m track, lane 1 running line: two straights + two semicircles.
 STRAIGHT = 84.39
@@ -30,7 +31,7 @@ RADIUS = (400.0 - 2 * STRAIGHT) / (2 * math.pi)  # ~36.80 m
 def local_radii(lat_deg: float) -> tuple[float, float]:
     s = math.sin(math.radians(lat_deg))
     w = math.sqrt(1 - WGS84_E2 * s * s)
-    return WGS84_A * (1 - WGS84_E2) / w ** 3, WGS84_A / w  # (M, N)
+    return WGS84_A * (1 - WGS84_E2) / w**3, WGS84_A / w  # (M, N)
 
 
 M_REF, N_REF = local_radii(REF_LAT)
@@ -46,17 +47,17 @@ def track_xy(s: float) -> tuple[float, float]:
     """Point at distance s (m) along the 400 m running line."""
     s %= 400.0
     half_circle = math.pi * RADIUS
-    if s < STRAIGHT:                       # bottom straight, heading +x
+    if s < STRAIGHT:  # bottom straight, heading +x
         return s, 0.0
     s -= STRAIGHT
-    if s < half_circle:                    # right bend
+    if s < half_circle:  # right bend
         a = s / RADIUS
         return STRAIGHT + RADIUS * math.sin(a), RADIUS - RADIUS * math.cos(a)
     s -= half_circle
-    if s < STRAIGHT:                       # top straight, heading -x
+    if s < STRAIGHT:  # top straight, heading -x
         return STRAIGHT - s, 2 * RADIUS
     s -= STRAIGHT
-    a = s / RADIUS                         # left bend
+    a = s / RADIUS  # left bend
     return -RADIUS * math.sin(a), RADIUS + RADIUS * math.cos(a)
 
 
@@ -75,11 +76,11 @@ def streets_xy(s: float, leg: float = 120.0) -> tuple[float, float]:
 
 @dataclass
 class Noise:
-    sigma_drift: float = 2.5    # m, slow wander
-    tau: float = 30.0           # s, how slowly it wanders
-    sigma_white: float = 0.6    # m, per-fix jitter
+    sigma_drift: float = 2.5  # m, slow wander
+    tau: float = 30.0  # s, how slowly it wanders
+    sigma_white: float = 0.6  # m, per-fix jitter
     h_acc: tuple[float, float] = (4.0, 7.0)
-    sigma_speed: float = 0.15   # m/s
+    sigma_speed: float = 0.15  # m/s
     speed_acc: tuple[float, float] = (0.3, 0.7)
 
 
@@ -95,22 +96,35 @@ class GPSError:
         k = math.sqrt(1 - phi * phi) * self.n.sigma_drift
         self.ex = phi * self.ex + k * self.rng.gauss(0, 1)
         self.ey = phi * self.ey + k * self.rng.gauss(0, 1)
-        return (self.ex + self.rng.gauss(0, self.n.sigma_white),
-                self.ey + self.rng.gauss(0, self.n.sigma_white))
+        return (self.ex + self.rng.gauss(0, self.n.sigma_white), self.ey + self.rng.gauss(0, self.n.sigma_white))
 
 
 def fix_line(t, x, y, h_acc, speed, speed_acc, stationary=False, **extra):
     lat, lon = to_latlon(x, y)
-    line = {"type": "fix", "t": round(t, 3), "lat": lat, "lon": lon,
-            "hAcc": round(h_acc, 2), "speed": round(speed, 3), "speedAcc": round(speed_acc, 2),
-            "stationary": stationary}
+    line = {
+        "type": "fix",
+        "t": round(t, 3),
+        "lat": lat,
+        "lon": lon,
+        "hAcc": round(h_acc, 2),
+        "speed": round(speed, 3),
+        "speedAcc": round(speed_acc, 2),
+        "stationary": stationary,
+    }
     line.update(extra)
     return line
 
 
 def header(name: str) -> dict:
-    return {"type": "header", "t": T0, "name": name, "device": "simulator", "os": "sim",
-            "app": "sim", "settings": settings_to_swift_dict(Settings())}
+    return {
+        "type": "header",
+        "t": T0,
+        "name": name,
+        "device": "simulator",
+        "os": "sim",
+        "app": "sim",
+        "settings": settings_to_swift_dict(Settings()),
+    }
 
 
 def simulate(kind: str, seed: int = 1) -> tuple[list[dict], float]:
@@ -123,7 +137,7 @@ def simulate(kind: str, seed: int = 1) -> tuple[list[dict], float]:
 
     def add(x, y, speed_true, stationary=False, noise_obj=None, err=None, h_rng=None, no_speed=False, **extra):
         ex, ey = err.step()
-        lo, hi = (h_rng or noise_obj.h_acc)
+        lo, hi = h_rng or noise_obj.h_acc
         h = rng.uniform(lo, hi)
         sp = max(0.0, speed_true + rng.gauss(0, noise_obj.sigma_speed))
         sa = rng.uniform(*noise_obj.speed_acc)
@@ -132,8 +146,9 @@ def simulate(kind: str, seed: int = 1) -> tuple[list[dict], float]:
         lines.append(fix_line(t, x + ex, y + ey, h, sp, sa, stationary, **extra))
 
     if kind == "urban":
-        noise = Noise(sigma_drift=6.0, tau=20.0, sigma_white=2.0, h_acc=(8.0, 35.0),
-                      sigma_speed=0.35, speed_acc=(0.6, 2.5))
+        noise = Noise(
+            sigma_drift=6.0, tau=20.0, sigma_white=2.0, h_acc=(8.0, 35.0), sigma_speed=0.35, speed_acc=(0.6, 2.5)
+        )
     if kind == "streets":
         path = streets_xy
     err = GPSError(noise, rng)
@@ -156,7 +171,7 @@ def simulate(kind: str, seed: int = 1) -> tuple[list[dict], float]:
                 stopped = True
                 x, y = path(s)
                 for k in range(60):  # 60 s standing still at a crossing
-                    flag = k >= 8     # iOS flags stationary after a few seconds
+                    flag = k >= 8  # iOS flags stationary after a few seconds
                     add(x, y, 0.0, stationary=flag, noise_obj=noise, err=err, simStop=True)
                     t += 1.0
             if kind == "stop_pause" and not stopped and s >= 500.0:
@@ -204,8 +219,18 @@ def simulate(kind: str, seed: int = 1) -> tuple[list[dict], float]:
     return lines, true_m
 
 
-KINDS = ["track", "slow", "streets", "stop", "stop_pause", "outliers", "urban", "drive", "standstill",
-         "standstill_nospeed"]
+KINDS = [
+    "track",
+    "slow",
+    "streets",
+    "stop",
+    "stop_pause",
+    "outliers",
+    "urban",
+    "drive",
+    "standstill",
+    "standstill_nospeed",
+]
 
 
 def main() -> int:

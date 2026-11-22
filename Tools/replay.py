@@ -11,6 +11,7 @@ Usage:
   python3 replay.py raw.jsonl --sweep
   python3 replay.py raw.jsonl --gpx track.gpx
 """
+
 from __future__ import annotations
 
 import argparse
@@ -70,18 +71,18 @@ class Fix:
 
 @dataclass(frozen=True)
 class Settings:
-    warmup_accuracy: float = 15.0      # m: a fix this good counts toward warm-up
-    warmup_fixes: int = 3              # consecutive good fixes before counting starts
-    max_accuracy: float = 25.0         # m: worse fixes are ignored while tracking
-    max_speed: float = 9.0             # m/s: faster implied movement is a GPS jump
-    stop_speed: float = 0.5            # m/s: slower reported speed means standing still
-    min_step_floor: float = 5.0        # m: minimum move before a segment is counted
+    warmup_accuracy: float = 15.0  # m: a fix this good counts toward warm-up
+    warmup_fixes: int = 3  # consecutive good fixes before counting starts
+    max_accuracy: float = 25.0  # m: worse fixes are ignored while tracking
+    max_speed: float = 9.0  # m/s: faster implied movement is a GPS jump
+    stop_speed: float = 0.5  # m/s: slower reported speed means standing still
+    min_step_floor: float = 5.0  # m: minimum move before a segment is counted
     min_step_accuracy_factor: float = 0.5  # min step also >= factor * accuracy
-    max_gap: float = 120.0             # s: longer gaps while moving are not bridged
-    jump_reset_count: int = 3          # consecutive jumps before re-anchoring
-    speed_max_accuracy: float = 3.0    # m/s: worse speed readings are ignored
-    speed_max_dt: float = 10.0         # s: longer intervals use straight-line distance
-    resume_gap: float = 5.0            # s: an update pause this long means iOS paused while stationary
+    max_gap: float = 120.0  # s: longer gaps while moving are not bridged
+    jump_reset_count: int = 3  # consecutive jumps before re-anchoring
+    speed_max_accuracy: float = 3.0  # m/s: worse speed readings are ignored
+    speed_max_dt: float = 10.0  # s: longer intervals use straight-line distance
+    resume_gap: float = 5.0  # s: an update pause this long means iOS paused while stationary
 
 
 SWIFT_KEYS = {
@@ -255,8 +256,7 @@ class Engine:
 
     def _speed_ok(self, x: Fix) -> bool:
         s = self.s
-        return (x.speed >= 0 and 0 <= x.speed_acc <= s.speed_max_accuracy
-                and 0 <= x.h_acc <= s.max_accuracy)
+        return x.speed >= 0 and 0 <= x.speed_acc <= s.speed_max_accuracy and 0 <= x.h_acc <= s.max_accuracy
 
     def _update_speed(self, f: Fix) -> None:
         s = self.s
@@ -313,15 +313,17 @@ def read_log(path: str) -> RunLog:
             if kind == "header" and not header:
                 header = obj
             elif kind == "fix" and "lat" in obj and "lon" in obj:
-                fixes.append(Fix(
-                    t=float(obj["t"]),
-                    lat=float(obj["lat"]),
-                    lon=float(obj["lon"]),
-                    h_acc=float(obj.get("hAcc", -1)),
-                    speed=float(obj.get("speed", -1)),
-                    speed_acc=float(obj.get("speedAcc", -1)),
-                    stationary=bool(obj.get("stationary", False)),
-                ))
+                fixes.append(
+                    Fix(
+                        t=float(obj["t"]),
+                        lat=float(obj["lat"]),
+                        lon=float(obj["lon"]),
+                        h_acc=float(obj.get("hAcc", -1)),
+                        speed=float(obj.get("speed", -1)),
+                        speed_acc=float(obj.get("speedAcc", -1)),
+                        stationary=bool(obj.get("stationary", False)),
+                    )
+                )
     return RunLog(header, fixes, lines)
 
 
@@ -346,8 +348,7 @@ def smoothed(fixes: list[Fix], mode: str) -> list[Fix]:
         prev: Fix | None = None
         for f in fixes:
             if prev is not None and 0 <= f.h_acc and f.t - prev.t <= 3 and 0 <= prev.h_acc:
-                f = replace(f, lat=alpha * f.lat + (1 - alpha) * prev.lat,
-                            lon=alpha * f.lon + (1 - alpha) * prev.lon)
+                f = replace(f, lat=alpha * f.lat + (1 - alpha) * prev.lat, lon=alpha * f.lon + (1 - alpha) * prev.lon)
             out.append(f)
             prev = f
         return out
@@ -370,8 +371,10 @@ def _iso(t: float) -> str:
 
 
 def write_gpx(path: str, name: str, fixes: list[Fix], engine: Engine) -> None:
-    out = ['<?xml version="1.0" encoding="UTF-8"?>',
-           '<gpx version="1.1" creator="JogLockTracker replay" xmlns="http://www.topografix.com/GPX/1/1">']
+    out = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<gpx version="1.1" creator="JogLockTracker replay" xmlns="http://www.topografix.com/GPX/1/1">',
+    ]
     out.append(f"  <trk><name>{name} - all fixes</name><trkseg>")
     for f in fixes:
         if f.h_acc >= 0:
@@ -410,8 +413,9 @@ def _fmt_dur(sec: float) -> str:
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 
-def report(log: RunLog, settings: Settings, true_km: float | None, strava_km: float | None,
-           compare_phone: bool = True) -> Engine:
+def report(
+    log: RunLog, settings: Settings, true_km: float | None, strava_km: float | None, compare_phone: bool = True
+) -> Engine:
     e, decisions = run_engine(log.fixes, settings)
     fixes = log.fixes
     dur = fixes[-1].t - fixes[0].t if len(fixes) > 1 else 0.0
@@ -420,7 +424,9 @@ def report(log: RunLog, settings: Settings, true_km: float | None, strava_km: fl
 
     print(f"Fixes: {len(fixes)}   duration {_fmt_dur(dur)}   moving {_fmt_dur(e.moving)}")
     if log.header:
-        print(f"Device: {log.header.get('device', '?')}  iOS {log.header.get('os', '?')}  app {log.header.get('app', '?')}")
+        print(
+            f"Device: {log.header.get('device', '?')}  iOS {log.header.get('os', '?')}  app {log.header.get('app', '?')}"
+        )
     print()
     print("Distances")
     for label, meters in (("Clean (Jog Lock)", e.clean), ("Speed-based", e.speed_dist), ("Raw (no clean-up)", e.raw)):
@@ -438,13 +444,20 @@ def report(log: RunLog, settings: Settings, true_km: float | None, strava_km: fl
     # Parity check: the app logs its own running totals, so a replay with the
     # same settings should land on exactly the same numbers.
     if compare_phone:
-        stop = next((ln for ln in reversed(log.lines)
-                     if ln.get("type") == "event" and ln.get("name") == "stop" and ln.get("clean") is not None), None)
+        stop = next(
+            (
+                ln
+                for ln in reversed(log.lines)
+                if ln.get("type") == "event" and ln.get("name") == "stop" and ln.get("clean") is not None
+            ),
+            None,
+        )
         if stop is not None:
             phone_clean, mine = stop["clean"], e.clean
         else:
-            last = next((ln for ln in reversed(log.lines)
-                         if ln.get("type") == "fix" and ln.get("clean") is not None), None)
+            last = next(
+                (ln for ln in reversed(log.lines) if ln.get("type") == "fix" and ln.get("clean") is not None), None
+            )
             phone_clean = last["clean"] if last else None
             mine = run_engine(log.fixes, settings, finalize=False)[0].clean
         if phone_clean is not None:
@@ -518,6 +531,7 @@ def sweep(log: RunLog, base: Settings, true_km: float | None) -> None:
 def _read_summary_notes(log_path: str) -> dict:
     """Pick up Strava / true distance typed into the app (summary.json next to the log)."""
     import os
+
     path = os.path.join(os.path.dirname(os.path.abspath(log_path)), "summary.json")
     try:
         with open(path, encoding="utf-8") as fh:
@@ -532,12 +546,20 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("log", help="raw.jsonl exported from the app")
     ap.add_argument("--true-km", type=float, help="measured true distance in km")
     ap.add_argument("--strava-km", type=float, help="Strava's distance for the same run in km")
-    ap.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
-                    help="override a setting (Swift or Python name), e.g. minStepFloor=3")
+    ap.add_argument(
+        "--set",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="override a setting (Swift or Python name), e.g. minStepFloor=3",
+    )
     ap.add_argument("--sweep", action="store_true", help="show how the distance changes with each setting")
     ap.add_argument("--gpx", help="write a GPX with all fixes and the counted points")
-    ap.add_argument("--use-defaults", action="store_true",
-                    help="ignore settings recorded in the log header and use current defaults")
+    ap.add_argument(
+        "--use-defaults",
+        action="store_true",
+        help="ignore settings recorded in the log header and use current defaults",
+    )
     args = ap.parse_args(argv)
 
     log = read_log(args.log)
