@@ -22,7 +22,7 @@ public final class RunLogWriter {
     public init(url: URL) throws {
         let fm = FileManager.default
         if !fm.fileExists(atPath: url.path) {
-            fm.createFile(atPath: url.path, contents: nil)
+            _ = fm.createFile(atPath: url.path, contents: nil)
         }
         let fileHandle = try FileHandle(forWritingTo: url)
         _ = try fileHandle.seekToEnd()
