@@ -8,6 +8,7 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 - The step check (anti-cheat): only GPS distance backed by steps, and not covered in a car or on a bike, counts toward unlocking. Run logs now include step and motion lines, and the stop event and run summary record what counted and what didn't.
 - Motion & Fitness permission, with a warning when it's off.
+- Treadmill mode: distance from steps × a stride length learned on your outdoor runs (or the iPhone's own estimate until then), with the same car, bike and standing-still checks.
 - CI on every pull request: Python lint and mirror tests on Linux, and an unsigned iOS build on macOS.
 - A regression test built from the first real jog (anonymised), pinning its cleaned, speed-based and raw totals.
 - `Tools/anonymize_log.py`, to make a run log safe to commit.

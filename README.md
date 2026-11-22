@@ -23,6 +23,17 @@ Only distance you cover on foot counts toward unlocking. The app checks the GPS 
 
 The live screen and run details show what counted and what didn't (too few steps, or car or bike). Walking counts the same as running.
 
+## Treadmill mode
+
+Pick **Treadmill** before starting. There's no GPS indoors, so distance comes from your steps:
+
+- **Your own stride.** Every outdoor run that passes the step check teaches the app your step length at different cadences (half-minute windows of GPS distance ÷ steps). On a treadmill, each step counts as that length at the cadence you're running. Until you've done an outdoor run, it uses the iPhone's own step-based distance.
+- **Keep the phone on you**, in a pocket or an armband. On the treadmill's console it can't count steps.
+- **The app can be in the background.** Distance catches up when you open it again; tap Stop at the end for the final count, which also fills in Core Motion's activity history for the run.
+- **Checks:** steps faster than 4 a second don't count, and neither does time Core Motion is fairly sure you were in a car, on a bike or standing still.
+
+Treadmill distance is an estimate: expect it within a few per cent once your stride is learned, and less accurate before that.
+
 ## Put it on your iPhone
 
 You need Xcode 16 or later (Xcode 26 is fine) and an iPhone on iOS 18 or later.
@@ -106,7 +117,7 @@ These numbers come from a made-up noise model, so your jog decides which method 
 ## Known limits of approach 1
 
 - **Determined cheating:** the step check stops driving and cycling, but someone shaking the phone in a slow car could fool it if Core Motion misses the car. Jogging and driving in short turns adds at most about 10% of the driven distance.
-- **Indoors:** treadmills and indoor runs get no GPS, so no distance.
+- **Treadmill:** distance is steps × your learned stride, so it can't be checked against GPS. Someone could shake the phone by hand; the cadence limit and Core Motion's activity make that slower than running.
 - **Force-quit:** swiping the app away stops tracking. If iOS ends the app itself, it relaunches and resumes the run on its own (the blue location pill stays on).
 
 ## If Xcode won't open the project
@@ -130,12 +141,14 @@ Packages/JogLockCore/       logic that doesn't need an iPhone, tested with `swif
   DistanceEngine.swift      clean-up rules + the three distance estimates
   StepGate.swift            the step check: GPS distance must be backed by steps
   RunCounter.swift          engine + step check, fed in arrival order; rebuilds a run from its log
+  Treadmill.swift           treadmill distance from steps, and the stride model learned on GPS runs
   Format.swift              how distances and times are shown
   RunLog.swift              log line and run summary formats
   RunStore.swift            run files (raw.jsonl, summary.json, GPX export)
 JogLockTracker/             the iPhone app
   RunTracker.swift          location stream, background session, logging, alerts, resume
   MotionTracker.swift       steps and motion activity from Core Motion
+  StrideStore.swift         the learned stride samples, kept on the phone
   RunStore+Device.swift     where runs are saved on the phone
   ContentView.swift         live screen
   RunListView.swift         past runs, notes, sharing
@@ -146,7 +159,9 @@ Tools/
   test_engine.py            checks on simulated runs and the real-run fixture
   stepgate.py               Python mirror of the step check
   test_stepgate.py          step check scenarios (the Swift tests use the same ones)
-  make_gate_fixture.py      builds the synthetic run with steps used by both test suites
+  treadmill.py              Python mirror of treadmill mode and stride learning
+  test_treadmill.py         treadmill scenarios (the Swift tests use the same ones)
+  make_fixtures.py          builds the synthetic runs used by both test suites
   anonymize_log.py          make a run log safe to commit
   fixtures/                 anonymised real runs used as regression tests
 docs/adr/                   architecture decision records
