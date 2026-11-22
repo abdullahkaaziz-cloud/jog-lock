@@ -7,13 +7,14 @@ import Testing
 /// both implementations are held to one result.
 @Suite("Real run fixture")
 struct RunFixtureTests {
-    static let fixture = URL(fileURLWithPath: #filePath)
+    static let fixtures = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()  // JogLockCoreTests
         .deletingLastPathComponent()  // Tests
         .deletingLastPathComponent()  // JogLockCore
         .deletingLastPathComponent()  // Packages
         .deletingLastPathComponent()  // repository root
-        .appendingPathComponent("Tools/fixtures/run1-anon.jsonl")
+        .appendingPathComponent("Tools/fixtures", isDirectory: true)
+    static let fixture = fixtures.appendingPathComponent("run1-anon.jsonl")
 
     @Test("Replaying the log gives the totals the phone showed")
     func replayMatchesPhone() throws {

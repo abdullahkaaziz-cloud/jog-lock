@@ -32,6 +32,18 @@ public struct LogLine: Codable, Equatable, Sendable {
     public var speedDist: Double?
     public var raw: Double?
 
+    // Step and motion fields ("steps" and "motion" lines)
+    public var steps: Int?             // pedometer count since the run started
+    public var pedMeters: Double?      // the iPhone's own distance estimate from steps
+    public var cadence: Double?        // steps per second
+    public var activity: MotionKind?
+    public var confidence: MotionConfidence?
+
+    // Totals on the "stop" event (metres)
+    public var counted: Double?
+    public var noSteps: Double?
+    public var vehicle: Double?
+
     // Header and event fields
     public var name: String?
     public var detail: String?
@@ -39,6 +51,7 @@ public struct LogLine: Codable, Equatable, Sendable {
     public var os: String?
     public var app: String?
     public var settings: EngineSettings?
+    public var gate: StepGateSettings?
     public var targetKm: Double?
 
     public init(type: String, t: Double) {
@@ -68,13 +81,22 @@ public struct RunSummary: Codable, Equatable, Identifiable, Sendable {
     public var stravaKm: Double?
     public var trueKm: Double?
     public var note: String?
+    // Anti-cheat results; nil for runs recorded before the step check existed.
+    public var countedMeters: Double?
+    public var noStepsMeters: Double?
+    public var vehicleMeters: Double?
+    public var countedTargetAt: Date?
+    public var steps: Int?
+    public var pedometerMeters: Double?
 
     public init(id: String, startedAt: Date, endedAt: Date, targetKm: Double,
                 cleanMeters: Double, speedMeters: Double, rawMeters: Double,
                 movingSeconds: Double, fixCount: Int, acceptedCount: Int,
                 rejected: [String: Int], cleanTargetAt: Date? = nil, speedTargetAt: Date? = nil,
                 device: String, os: String, appVersion: String, settings: EngineSettings,
-                stravaKm: Double? = nil, trueKm: Double? = nil, note: String? = nil) {
+                stravaKm: Double? = nil, trueKm: Double? = nil, note: String? = nil,
+                countedMeters: Double? = nil, noStepsMeters: Double? = nil, vehicleMeters: Double? = nil,
+                countedTargetAt: Date? = nil, steps: Int? = nil, pedometerMeters: Double? = nil) {
         self.id = id
         self.startedAt = startedAt
         self.endedAt = endedAt
@@ -95,6 +117,12 @@ public struct RunSummary: Codable, Equatable, Identifiable, Sendable {
         self.stravaKm = stravaKm
         self.trueKm = trueKm
         self.note = note
+        self.countedMeters = countedMeters
+        self.noStepsMeters = noStepsMeters
+        self.vehicleMeters = vehicleMeters
+        self.countedTargetAt = countedTargetAt
+        self.steps = steps
+        self.pedometerMeters = pedometerMeters
     }
 }
 

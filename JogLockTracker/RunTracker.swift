@@ -33,6 +33,8 @@ final class RunTracker: NSObject, ObservableObject {
     @Published private(set) var lastAccuracy: Double?
     @Published private(set) var startedAt: Date?
     @Published private(set) var runTargetKm: Double = 1
+    @Published private(set) var gateTotals = GateTotals()
+    @Published private(set) var countedTargetReached = false
     @Published private(set) var cleanTargetReached = false
     @Published private(set) var speedTargetReached = false
     @Published private(set) var warning: String?
@@ -53,7 +55,11 @@ final class RunTracker: NSObject, ObservableObject {
     }
 
     private let manager = CLLocationManager()   // only used for permission prompts
-    private var engine = DistanceEngine()
+    private var counter = RunCounter(start: 0)
+    private let motion = MotionTracker()
+    private var isStopping = false
+    private var countedTargetAt: Date?
+    private var pedometerMeters: Double?
     private var writer: RunLogWriter?
     private var runID: String?
     private var cleanTargetAt: Date?
@@ -88,22 +94,40 @@ final class RunTracker: NSObject, ObservableObject {
             status = .idle
             return
         }
+        guard !isStopping else { return }
+        isStopping = true
         updatesTask?.cancel()
         updatesTask = nil
         endSessions()
+        Task { await finishRun(id: id) }
+    }
 
-        snapshot = engine.finalize()
-        checkTargets(at: Date(), notifyUser: false)
+    /// Takes the pedometer's final count (live updates lag a few seconds),
+    /// settles the step check and saves the run.
+    private func finishRun(id: String) async {
+        let end = Date()
+        if let start = startedAt, let totals = await motion.totals(from: start, to: end) {
+            let sample = StepSample(t: end.timeIntervalSince1970, steps: totals.steps)
+            counter.addSteps(sample)
+            pedometerMeters = totals.meters
+            writeSteps(sample, meters: totals.meters, cadence: nil, detail: "final")
+        }
+        motion.stop()
+        counter.finish()
+        snapshot = counter.engine.snapshot
+        gateTotals = counter.gate.totals
+        checkTargets(at: end, notifyUser: false)
         logEvent("stop", totals: true)
         writer?.close()
         writer = nil
 
-        let summary = makeSummary(id: id, endedAt: Date())
+        let summary = makeSummary(id: id, endedAt: end)
         try? RunStore.onDevice.save(summary)
         lastFinishedRun = summary
 
         clearActiveRun()
         runID = nil
+        isStopping = false
         diagnostic = nil
         status = .idle
     }
@@ -128,6 +152,11 @@ final class RunTracker: NSObject, ObservableObject {
         }
         _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
         guard status == .requestingPermission else { return }
+        if !MotionTracker.canCountSteps {
+            warning = "This iPhone can't count steps, so distance can't be checked and won't count."
+        } else if MotionTracker.isDenied {
+            warning = "Motion & Fitness is off, so your steps can't be checked and distance won't count. Turn it on in Settings > Privacy & Security > Motion & Fitness."
+        }
 
         let id = RunStore.newRunID()
         do {
@@ -142,9 +171,13 @@ final class RunTracker: NSObject, ObservableObject {
         let now = Date()
         runID = id
         runTargetKm = targetKm
-        engine = DistanceEngine(settings: .standard)
-        snapshot = engine.snapshot
+        counter = RunCounter(start: now.timeIntervalSince1970)
+        snapshot = counter.engine.snapshot
+        gateTotals = counter.gate.totals
         startedAt = now
+        countedTargetReached = false
+        countedTargetAt = nil
+        pedometerMeters = nil
         cleanTargetReached = false
         speedTargetReached = false
         cleanTargetAt = nil
@@ -157,9 +190,20 @@ final class RunTracker: NSObject, ObservableObject {
         defaults.set(now.timeIntervalSince1970, forKey: Keys.activeRunStart)
         defaults.set(runTargetKm, forKey: Keys.activeRunTarget)
 
-        writeHeader()
+        writeHeader(at: now)
         logEvent("start")
         beginUpdates()
+        startMotion(from: now)
+    }
+
+    private func startMotion(from start: Date) {
+        motion.onSteps = { [weak self] sample, meters, cadence in
+            self?.handleSteps(sample, meters: meters, cadence: cadence)
+        }
+        motion.onMotion = { [weak self] sample in
+            self?.handleMotion(sample)
+        }
+        motion.start(from: start)
     }
 
     private func beginUpdates() {
@@ -192,12 +236,14 @@ final class RunTracker: NSObject, ObservableObject {
     // MARK: - Updates
 
     private func handle(_ update: CLLocationUpdate) {
+        guard !isStopping else { return }
         let stationary = update.stationary
         noteDiagnostics(update)
         guard let location = update.location else { return }
 
-        let decision = engine.process(GPSFix(location: location, stationary: stationary))
-        snapshot = engine.snapshot
+        let decision = counter.add(GPSFix(location: location, stationary: stationary))
+        snapshot = counter.engine.snapshot
+        gateTotals = counter.gate.totals
         lastAccuracy = location.horizontalAccuracy >= 0 ? location.horizontalAccuracy : nil
         writeFix(location, stationary: stationary, decision: decision)
 
@@ -214,6 +260,21 @@ final class RunTracker: NSObject, ObservableObject {
             logEvent("gpsReady")
         }
         checkTargets(at: location.timestamp, notifyUser: true)
+    }
+
+    private func handleSteps(_ sample: StepSample, meters: Double?, cadence: Double?) {
+        guard runID != nil, !isStopping else { return }
+        counter.addSteps(sample)
+        gateTotals = counter.gate.totals
+        writeSteps(sample, meters: meters, cadence: cadence, detail: nil)
+        checkTargets(at: Date(timeIntervalSince1970: sample.t), notifyUser: true)
+    }
+
+    private func handleMotion(_ sample: MotionSample) {
+        guard runID != nil, !isStopping else { return }
+        if counter.addMotion(sample) {
+            writeMotion(sample)
+        }
     }
 
     private func noteDiagnostics(_ update: CLLocationUpdate) {
@@ -235,15 +296,21 @@ final class RunTracker: NSObject, ObservableObject {
 
     private func checkTargets(at time: Date, notifyUser: Bool) {
         let goal = runTargetKm * 1000
+        if !countedTargetReached && gateTotals.countedMeters >= goal {
+            countedTargetReached = true
+            countedTargetAt = time
+            logEvent("targetReached", detail: "counted")
+            if notifyUser {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                notify(title: "\(Format.km(runTargetKm)) km reached - apps unlocked",
+                       body: "Your steps check out. Note where you are.")
+            }
+        }
+        // GPS distance before the step check, logged for comparison.
         if !cleanTargetReached && snapshot.cleanMeters >= goal {
             cleanTargetReached = true
             cleanTargetAt = time
             logEvent("targetReached", detail: "clean")
-            if notifyUser {
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                notify(title: "\(Format.km(runTargetKm)) km reached - apps unlocked",
-                       body: "Jog Lock's distance hit your target. Note where you are.")
-            }
         }
         // The speed-based estimate isn't shown any more (it ran 4.6% short on
         // the first real jog), but it is still logged for comparison.
@@ -286,24 +353,18 @@ final class RunTracker: NSObject, ObservableObject {
         let target = defaults.double(forKey: Keys.activeRunTarget)
 
         let lines = RunStore.onDevice.readLines(id: id)
-        let settings = lines.first(where: { $0.type == "header" })?.settings ?? .standard
         runTargetKm = target > 0 ? target : targetKm
-        startedAt = Date(timeIntervalSince1970: start)
-        engine = DistanceEngine(settings: settings)
-        let goal = runTargetKm * 1000
-        for line in lines {
-            guard let fix = GPSFix(line: line) else { continue }
-            engine.process(fix)
-            if cleanTargetAt == nil && engine.snapshot.cleanMeters >= goal {
-                cleanTargetAt = Date(timeIntervalSince1970: fix.t)
-            }
-            if speedTargetAt == nil && engine.snapshot.speedMeters >= goal {
-                speedTargetAt = Date(timeIntervalSince1970: fix.t)
-            }
-        }
+        let runStart = Date(timeIntervalSince1970: start)
+        startedAt = runStart
+        counter = RunCounter.replaying(lines)
+        countedTargetAt = Self.targetTime(in: lines, kind: "counted")
+        cleanTargetAt = Self.targetTime(in: lines, kind: "clean")
+        speedTargetAt = Self.targetTime(in: lines, kind: "speed")
+        countedTargetReached = countedTargetAt != nil
         cleanTargetReached = cleanTargetAt != nil
         speedTargetReached = speedTargetAt != nil
-        snapshot = engine.snapshot
+        snapshot = counter.engine.snapshot
+        gateTotals = counter.gate.totals
         runID = id
         writer = try? RunLogWriter(url: RunStore.onDevice.rawLogURL(for: id))
 
@@ -317,6 +378,12 @@ final class RunTracker: NSObject, ObservableObject {
         logEvent("resumed")
         warning = "Resumed a run that iOS interrupted."
         beginUpdates()
+        startMotion(from: runStart)
+    }
+
+    private static func targetTime(in lines: [LogLine], kind: String) -> Date? {
+        lines.first(where: { $0.type == "event" && $0.name == "targetReached" && $0.detail == kind })
+            .map { Date(timeIntervalSince1970: $0.t) }
     }
 
     private func clearActiveRun() {
@@ -328,13 +395,15 @@ final class RunTracker: NSObject, ObservableObject {
 
     // MARK: - Logging
 
-    private func writeHeader() {
-        var line = LogLine(type: "header", t: Date().timeIntervalSince1970)
+    /// The header's time is the run start, which the step check also starts from.
+    private func writeHeader(at start: Date) {
+        var line = LogLine(type: "header", t: start.timeIntervalSince1970)
         line.name = runID
         line.device = Self.deviceModel
         line.os = UIDevice.current.systemVersion
         line.app = Self.appVersion
-        line.settings = engine.settings
+        line.settings = counter.engine.settings
+        line.gate = counter.gate.settings
         line.targetKm = runTargetKm
         writer?.write(line)
     }
@@ -362,6 +431,22 @@ final class RunTracker: NSObject, ObservableObject {
         writer?.write(line)
     }
 
+    private func writeSteps(_ sample: StepSample, meters: Double?, cadence: Double?, detail: String?) {
+        var line = LogLine(type: "steps", t: sample.t)
+        line.steps = sample.steps
+        line.pedMeters = meters
+        line.cadence = cadence
+        line.detail = detail
+        writer?.write(line)
+    }
+
+    private func writeMotion(_ sample: MotionSample) {
+        var line = LogLine(type: "motion", t: sample.start)
+        line.activity = sample.kind
+        line.confidence = sample.confidence
+        writer?.write(line)
+    }
+
     private func logEvent(_ name: String, detail: String? = nil, totals: Bool = false) {
         var line = LogLine(type: "event", t: Date().timeIntervalSince1970)
         line.name = name
@@ -370,6 +455,10 @@ final class RunTracker: NSObject, ObservableObject {
             line.clean = snapshot.cleanMeters
             line.speedDist = snapshot.speedMeters
             line.raw = snapshot.rawMeters
+            line.counted = gateTotals.countedMeters
+            line.noSteps = gateTotals.noStepsMeters
+            line.vehicle = gateTotals.vehicleMeters
+            line.steps = gateTotals.steps
         }
         writer?.write(line)
     }
@@ -414,10 +503,16 @@ final class RunTracker: NSObject, ObservableObject {
                    device: Self.deviceModel,
                    os: UIDevice.current.systemVersion,
                    appVersion: Self.appVersion,
-                   settings: engine.settings,
+                   settings: counter.engine.settings,
                    stravaKm: nil,
                    trueKm: nil,
-                   note: nil)
+                   note: nil,
+                   countedMeters: gateTotals.countedMeters,
+                   noStepsMeters: gateTotals.noStepsMeters,
+                   vehicleMeters: gateTotals.vehicleMeters,
+                   countedTargetAt: countedTargetAt,
+                   steps: gateTotals.steps,
+                   pedometerMeters: pedometerMeters)
     }
 
     static var deviceModel: String {

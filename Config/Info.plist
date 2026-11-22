@@ -6,6 +6,8 @@
 	<string>Jog Tracker</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Jog Tracker uses your location during a run to measure how far you have jogged.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Jog Tracker counts your steps to check the distance was covered on foot, not in a car or on a bike.</string>
 	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
 	<dict>
 		<key>RunDistance</key>

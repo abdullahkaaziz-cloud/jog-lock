@@ -122,9 +122,25 @@ public enum Geo {
     }
 }
 
+/// A piece of distance the engine counted, and the time it covers.
+public struct CountedSegment: Equatable, Sendable {
+    public var start: TimeInterval
+    public var end: TimeInterval
+    public var meters: Double
+
+    public init(start: TimeInterval, end: TimeInterval, meters: Double) {
+        self.start = start
+        self.end = end
+        self.meters = meters
+    }
+}
+
 public struct DistanceEngine: Sendable {
     public let settings: EngineSettings
     public private(set) var snapshot = EngineSnapshot()
+    /// The distance counted by the most recent process(_:) or finalize()
+    /// call, or nil if that call counted nothing.
+    public private(set) var lastSegment: CountedSegment?
 
     private var goodStreak = 0
     private var anchor: GPSFix?
@@ -142,6 +158,7 @@ public struct DistanceEngine: Sendable {
     @discardableResult
     public mutating func process(_ f: GPSFix) -> FixDecision {
         let s = settings
+        lastSegment = nil
         snapshot.fixCount += 1
 
         // Raw estimator: every fix with a valid accuracy, from the first one.
@@ -242,6 +259,7 @@ public struct DistanceEngine: Sendable {
             snapshot.cleanMeters += d
             snapshot.movingSeconds += dtMove
             snapshot.acceptedCount += 1
+            lastSegment = CountedSegment(start: f.t - dtMove, end: f.t, meters: d)
             anchor = f
             return .accepted
         }
@@ -252,6 +270,7 @@ public struct DistanceEngine: Sendable {
     @discardableResult
     public mutating func finalize() -> EngineSnapshot {
         let s = settings
+        lastSegment = nil
         guard snapshot.phase == .tracking, !snapshot.isPaused,
               let a = anchor, let g = lastGood, g.t > a.t else {
             return snapshot
@@ -260,7 +279,9 @@ public struct DistanceEngine: Sendable {
         let d = Geo.distance(a, g)
         if dt <= s.maxGap && d / dt <= s.maxSpeed {
             snapshot.cleanMeters += d
-            snapshot.movingSeconds += max(0, g.t - max(a.t, motionStart))
+            let moved = max(0, g.t - max(a.t, motionStart))
+            snapshot.movingSeconds += moved
+            lastSegment = CountedSegment(start: g.t - moved, end: g.t, meters: d)
             anchor = g
         }
         return snapshot

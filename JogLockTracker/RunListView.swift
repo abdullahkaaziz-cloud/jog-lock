@@ -38,7 +38,7 @@ struct RunRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(run.startedAt.formatted(date: .abbreviated, time: .shortened))
                 .font(.headline)
-            Text("\(Format.km(run.cleanMeters / 1000)) km · raw \(Format.km(run.rawMeters / 1000))")
+            Text(ContentView.lastRunLine(run))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
@@ -72,8 +72,16 @@ struct RunDetailView: View {
     var body: some View {
         Form {
             Section("Distance") {
-                distanceRow("Jog Lock (cleaned)", run.cleanMeters)
-                distanceRow("Raw, no clean-up", run.rawMeters)
+                if let counted = run.countedMeters {
+                    distanceRow("Counted (steps checked)", counted)
+                    distanceRow("Not counted: too few steps", run.noStepsMeters ?? 0)
+                    distanceRow("Not counted: car or bike", run.vehicleMeters ?? 0)
+                }
+                distanceRow("GPS, cleaned", run.cleanMeters)
+                distanceRow("GPS, raw", run.rawMeters)
+                if let steps = run.steps {
+                    LabeledContent("Steps", value: "\(steps)")
+                }
             }
 
             Section {
@@ -99,8 +107,11 @@ struct RunDetailView: View {
                 LabeledContent("Duration", value: Format.duration(run.endedAt.timeIntervalSince(run.startedAt)))
                 LabeledContent("Moving time", value: Format.duration(run.movingSeconds))
                 LabeledContent("Target", value: "\(Format.km(run.targetKm)) km")
+                if let at = run.countedTargetAt {
+                    LabeledContent("Target hit (counted)", value: "after " + Format.duration(at.timeIntervalSince(run.startedAt)))
+                }
                 if let at = run.cleanTargetAt {
-                    LabeledContent("Target hit (cleaned)", value: "after " + Format.duration(at.timeIntervalSince(run.startedAt)))
+                    LabeledContent("Target hit (GPS)", value: "after " + Format.duration(at.timeIntervalSince(run.startedAt)))
                 }
                 LabeledContent("GPS fixes", value: "\(run.fixCount)")
                 LabeledContent("Dropped", value: droppedText)

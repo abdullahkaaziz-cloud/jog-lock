@@ -12,6 +12,17 @@ The app saves every GPS point to a log, so a run can be replayed later with diff
 
 There's no app blocking in this build, only the distance tracking.
 
+## The step check (anti-cheat)
+
+Only distance you cover on foot counts toward unlocking. The app checks the GPS distance against the iPhone's step counter and its motion activity (Motion & Fitness permission):
+
+- **Steps back the distance.** Each step can cover at most 2 m, which is more than any jogger's step. GPS distance that the steps nearby (within 5 seconds) can't cover isn't counted. Driving, or a phone left on a car seat, gets no steps, so it doesn't count.
+- **Cars and bikes don't count.** If Core Motion is fairly sure you're in a car or on a bike, that distance doesn't count, even if the phone is being shaken to fake steps.
+- **It takes a minute to settle.** Step and motion data can arrive late, so each bit of distance waits up to a minute before it's settled. The ring shows it straight away; the unlock happens once it's settled, or as soon as you tap Stop.
+- **Motion & Fitness must be on.** Without it there are no steps, so nothing counts. The app says so at the start of a run.
+
+The live screen and run details show what counted and what didn't (too few steps, or car or bike). Walking counts the same as running.
+
 ## Put it on your iPhone
 
 You need Xcode 16 or later (Xcode 26 is fine) and an iPhone on iOS 18 or later.
@@ -94,7 +105,7 @@ These numbers come from a made-up noise model, so your jog decides which method 
 
 ## Known limits of approach 1
 
-- **Cycling:** it can't tell jogging from cycling at jogging speeds. Driving is ignored. Checking steps and motion would fix this, which is the next step.
+- **Determined cheating:** the step check stops driving and cycling, but someone shaking the phone in a slow car could fool it if Core Motion misses the car. Jogging and driving in short turns adds at most about 10% of the driven distance.
 - **Indoors:** treadmills and indoor runs get no GPS, so no distance.
 - **Force-quit:** swiping the app away stops tracking. If iOS ends the app itself, it relaunches and resumes the run on its own (the blue location pill stays on).
 
@@ -117,10 +128,14 @@ JogLockTracker.xcodeproj    Xcode project (Xcode 16+), with a shared scheme
 Config/Info.plist           permissions, background location, Files app access
 Packages/JogLockCore/       logic that doesn't need an iPhone, tested with `swift test`
   DistanceEngine.swift      clean-up rules + the three distance estimates
+  StepGate.swift            the step check: GPS distance must be backed by steps
+  RunCounter.swift          engine + step check, fed in arrival order; rebuilds a run from its log
+  Format.swift              how distances and times are shown
   RunLog.swift              log line and run summary formats
   RunStore.swift            run files (raw.jsonl, summary.json, GPX export)
 JogLockTracker/             the iPhone app
   RunTracker.swift          location stream, background session, logging, alerts, resume
+  MotionTracker.swift       steps and motion activity from Core Motion
   RunStore+Device.swift     where runs are saved on the phone
   ContentView.swift         live screen
   RunListView.swift         past runs, notes, sharing
@@ -129,6 +144,9 @@ Tools/
   replay.py                 re-run a log with any settings, compare, export GPX
   simulate.py               make synthetic runs
   test_engine.py            checks on simulated runs and the real-run fixture
+  stepgate.py               Python mirror of the step check
+  test_stepgate.py          step check scenarios (the Swift tests use the same ones)
+  make_gate_fixture.py      builds the synthetic run with steps used by both test suites
   anonymize_log.py          make a run log safe to commit
   fixtures/                 anonymised real runs used as regression tests
 docs/adr/                   architecture decision records
