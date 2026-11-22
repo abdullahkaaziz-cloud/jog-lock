@@ -261,6 +261,29 @@ def test_replay_parity_roundtrip():
     check("replay reproduces logged totals", abs(e2.clean - e.clean) < 1e-6, f"{e2.clean:.3f} vs {e.clean:.3f}")
 
 
+FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+
+
+def test_run1_fixture():
+    """Real run, 22 Nov 2026 (anonymised): Strava 3.00 km, phone said 3.012 km.
+
+    Guards against any change to the engine silently moving the numbers on
+    real data. If a deliberate rule change moves them, update the expected
+    values here and say why in the commit message.
+    """
+    log = read_log(os.path.join(FIXTURES, "run1-anon.jsonl"))
+    e, _ = run_engine(log.fixes, Settings())
+    stop = next(ln for ln in log.lines if ln.get("type") == "event" and ln.get("name") == "stop")
+    check(
+        "run 1: replay matches the phone's live total",
+        abs(e.clean - stop["clean"]) < 0.5,
+        f"replay {e.clean:.2f} m, phone {stop['clean']:.2f} m",
+    )
+    check("run 1: cleaned distance is 3012.2 m (Strava 3000 m)", abs(e.clean - 3012.22) < 0.5, f"{e.clean:.2f} m")
+    check("run 1: speed-based distance is 2863.4 m", abs(e.speed_dist - 2863.39) < 0.5, f"{e.speed_dist:.2f} m")
+    check("run 1: raw distance is 3048.5 m", abs(e.raw - 3048.47) < 0.5, f"{e.raw:.2f} m")
+
+
 if __name__ == "__main__":
     for fn in [
         test_geometry,
@@ -278,6 +301,7 @@ if __name__ == "__main__":
         test_gap_not_bridged,
         test_finalize_tail,
         test_replay_parity_roundtrip,
+        test_run1_fixture,
     ]:
         fn()
     print()
