@@ -31,8 +31,10 @@ jobs:
         run: ruff check Tools
       - name: Format check
         run: ruff format --check Tools
-      - name: Engine mirror tests
-        run: python Tools/test_engine.py
+      - name: Engine and step-gate mirror tests
+        run: |
+          python Tools/test_engine.py
+          python Tools/test_stepgate.py
 
   core:
     name: Core package tests (Linux)
