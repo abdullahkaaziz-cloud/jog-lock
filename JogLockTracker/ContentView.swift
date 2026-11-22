@@ -121,10 +121,9 @@ struct ContentView: View {
     private var comparisonCard: some View {
         let s = tracker.snapshot
         return VStack(alignment: .leading, spacing: 10) {
-            Text("Same run, three ways")
+            Text("Same run, two ways")
                 .font(.headline)
             CompareRow(label: "Jog Lock (cleaned)", meters: s.cleanMeters, emphasised: true)
-            CompareRow(label: "Speed-based", meters: s.speedMeters, emphasised: false)
             CompareRow(label: "Raw, no clean-up", meters: s.rawMeters, emphasised: false)
             Divider()
             HStack {
@@ -194,7 +193,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Last run")
                         .font(.headline)
-                    Text("\(Format.km(run.cleanMeters / 1000)) km cleaned · \(Format.km(run.speedMeters / 1000)) speed · \(Format.km(run.rawMeters / 1000)) raw")
+                    Text("\(Format.km(run.cleanMeters / 1000)) km cleaned · \(Format.km(run.rawMeters / 1000)) raw")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()

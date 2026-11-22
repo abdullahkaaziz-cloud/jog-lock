@@ -255,14 +255,12 @@ final class RunTracker: NSObject, ObservableObject {
                        body: "Jog Lock's distance hit your target. Note where you are.")
             }
         }
+        // The speed-based estimate isn't shown any more (it ran 4.6% short on
+        // the first real jog), but it is still logged for comparison.
         if !speedTargetReached && snapshot.speedMeters >= goal {
             speedTargetReached = true
             speedTargetAt = time
             logEvent("targetReached", detail: "speed")
-            if notifyUser {
-                notify(title: "Speed-based: \(Format.km(runTargetKm)) km",
-                       body: "The speed-based estimate hit your target too.")
-            }
         }
     }
 

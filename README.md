@@ -1,6 +1,6 @@
 # Jog Tracker: Jog Lock distance test build (approach 1)
 
-This test app measures jog distance with Core Location's fitness updates, then cleans up the GPS points the way Strava does. It shows three distances side by side so you can see which one matches reality:
+This test app measures jog distance with Core Location's fitness updates, then cleans up the GPS points the way Strava does. It works out three distances so you can see which one matches reality. The app shows the cleaned and raw numbers; the speed-based one is only in the run files, because it came out 4.6% short on the first real jog.
 
 | Number | How it's worked out |
 |---|---|
