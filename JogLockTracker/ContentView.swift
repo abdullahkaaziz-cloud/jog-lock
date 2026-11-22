@@ -292,6 +292,9 @@ struct DistanceRing: View {
         }
         .frame(width: 260, height: 260)
         .padding(.vertical, 8)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Distance")
+        .accessibilityValue("\(Format.km(meters / 1000)) of \(Format.km(targetKm)) kilometres. \(reached ? "Apps unlocked" : "Apps locked")")
     }
 }
 
@@ -313,6 +316,9 @@ struct StatTile: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(value)
     }
 }
 
@@ -330,6 +336,9 @@ struct CompareRow: View {
                 .monospacedDigit()
                 .fontWeight(emphasised ? .semibold : .regular)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(String(format: "%.3f kilometres", meters / 1000))
     }
 }
 
@@ -343,6 +352,7 @@ struct Banner: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: systemImage)
                 .foregroundStyle(tint)
+                .accessibilityHidden(true)
             Text(text)
                 .font(.footnote)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -353,6 +363,7 @@ struct Banner: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss")
             }
         }
         .padding(12)
