@@ -121,10 +121,9 @@ struct ContentView: View {
     private var comparisonCard: some View {
         let s = tracker.snapshot
         return VStack(alignment: .leading, spacing: 10) {
-            Text("Same run, three ways")
+            Text("Same run, two ways")
                 .font(.headline)
             CompareRow(label: "Jog Lock (cleaned)", meters: s.cleanMeters, emphasised: true)
-            CompareRow(label: "Speed-based", meters: s.speedMeters, emphasised: false)
             CompareRow(label: "Raw, no clean-up", meters: s.rawMeters, emphasised: false)
             Divider()
             HStack {
@@ -194,7 +193,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Last run")
                         .font(.headline)
-                    Text("\(Format.km(run.cleanMeters / 1000)) km cleaned · \(Format.km(run.speedMeters / 1000)) speed · \(Format.km(run.rawMeters / 1000)) raw")
+                    Text("\(Format.km(run.cleanMeters / 1000)) km cleaned · \(Format.km(run.rawMeters / 1000)) raw")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -230,8 +229,9 @@ struct ContentView: View {
     // MARK: - Formatting
 
     private func elapsedText(at date: Date) -> String {
-        guard tracker.isActive, let start = tracker.startedAt else { return "0:00" }
-        return Format.duration(date.timeIntervalSince(start))
+        Format.elapsed(now: date,
+                       activeSince: tracker.isActive ? tracker.startedAt : nil,
+                       lastRun: tracker.lastFinishedRun)
     }
 
     private var paceText: String {
@@ -292,6 +292,9 @@ struct DistanceRing: View {
         }
         .frame(width: 260, height: 260)
         .padding(.vertical, 8)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Distance")
+        .accessibilityValue("\(Format.km(meters / 1000)) of \(Format.km(targetKm)) kilometres. \(reached ? "Apps unlocked" : "Apps locked")")
     }
 }
 
@@ -313,6 +316,9 @@ struct StatTile: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(value)
     }
 }
 
@@ -330,6 +336,9 @@ struct CompareRow: View {
                 .monospacedDigit()
                 .fontWeight(emphasised ? .semibold : .regular)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(String(format: "%.3f kilometres", meters / 1000))
     }
 }
 
@@ -343,6 +352,7 @@ struct Banner: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: systemImage)
                 .foregroundStyle(tint)
+                .accessibilityHidden(true)
             Text(text)
                 .font(.footnote)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -353,40 +363,11 @@ struct Banner: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss")
             }
         }
         .padding(12)
         .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-enum Format {
-    static func km(_ value: Double) -> String {
-        String(format: "%.2f", value)
-    }
-
-    static func duration(_ seconds: Double) -> String {
-        guard seconds.isFinite, seconds >= 0 else { return "--" }
-        let total = Int(seconds.rounded())
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let s = total % 60
-        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
-    }
-
-    static func reason(_ key: String) -> String {
-        switch key {
-        case FixDecision.rejectedLowAccuracy.rawValue: return "weak signal"
-        case FixDecision.rejectedJump.rawValue: return "jumps"
-        case FixDecision.rejectedOutOfOrder.rawValue: return "duplicates"
-        case FixDecision.rejectedInvalid.rawValue: return "invalid"
-        default: return key
-        }
-    }
-
-    static func percent(_ value: Double, versus reference: Double) -> String {
-        guard reference > 0 else { return "" }
-        return String(format: "%+.1f%%", (value - reference) / reference * 100)
     }
 }
 

@@ -12,10 +12,19 @@ All notable changes to this project are listed here. The format follows [Keep a 
 - Contribution guide with the Definition of Done, a pull request template, and ADR-0001.
 - A shared Xcode scheme, so the app builds the same way on any Mac.
 - Swift unit tests for the distance engine, run files and the real-run fixture, run on Linux in CI.
+- VoiceOver labels on the live screen.
+- A privacy manifest (`PrivacyInfo.xcprivacy`).
 
 ### Changed
 
+- iOS 18 or later is required (same iPhones as iOS 17). This removes a deprecated location API.
+- The speed-based distance is no longer shown or notified. It is still logged for comparison.
 - The distance engine, run log formats and run files moved into a local Swift package, `JogLockCore`. The app links it. No change in behaviour.
+
+### Fixed
+
+- The Time tile no longer resets to 0:00 when a run is saved. It shows the finished run's length.
+- Differences that round to zero show as +0.0%, not -0.0%.
 
 ## [0.1.0] - 2026-11-22
 

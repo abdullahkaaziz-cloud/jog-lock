@@ -38,7 +38,7 @@ struct RunRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(run.startedAt.formatted(date: .abbreviated, time: .shortened))
                 .font(.headline)
-            Text("\(Format.km(run.cleanMeters / 1000)) km · speed \(Format.km(run.speedMeters / 1000)) · raw \(Format.km(run.rawMeters / 1000))")
+            Text("\(Format.km(run.cleanMeters / 1000)) km · raw \(Format.km(run.rawMeters / 1000))")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
@@ -73,7 +73,6 @@ struct RunDetailView: View {
         Form {
             Section("Distance") {
                 distanceRow("Jog Lock (cleaned)", run.cleanMeters)
-                distanceRow("Speed-based", run.speedMeters)
                 distanceRow("Raw, no clean-up", run.rawMeters)
             }
 
@@ -102,9 +101,6 @@ struct RunDetailView: View {
                 LabeledContent("Target", value: "\(Format.km(run.targetKm)) km")
                 if let at = run.cleanTargetAt {
                     LabeledContent("Target hit (cleaned)", value: "after " + Format.duration(at.timeIntervalSince(run.startedAt)))
-                }
-                if let at = run.speedTargetAt {
-                    LabeledContent("Target hit (speed)", value: "after " + Format.duration(at.timeIntervalSince(run.startedAt)))
                 }
                 LabeledContent("GPS fixes", value: "\(run.fixCount)")
                 LabeledContent("Dropped", value: droppedText)

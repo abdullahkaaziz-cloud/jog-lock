@@ -60,7 +60,7 @@ final class RunTracker: NSObject, ObservableObject {
     private var speedTargetAt: Date?
     private var updatesTask: Task<Void, Never>?
     private var backgroundSession: CLBackgroundActivitySession?
-    private var serviceSession: AnyObject?       // CLServiceSession on iOS 18+
+    private var serviceSession: CLServiceSession?
     private var authContinuation: CheckedContinuation<Void, Never>?
     private var observers: [NSObjectProtocol] = []
 
@@ -165,9 +165,7 @@ final class RunTracker: NSObject, ObservableObject {
     private func beginUpdates() {
         // Keeps location coming with the screen locked (blue pill in the status bar).
         backgroundSession = CLBackgroundActivitySession()
-        if #available(iOS 18.0, *) {
-            serviceSession = CLServiceSession(authorization: .whenInUse)
-        }
+        serviceSession = CLServiceSession(authorization: .whenInUse)
         status = .waitingForGPS
 
         updatesTask?.cancel()
@@ -187,22 +185,15 @@ final class RunTracker: NSObject, ObservableObject {
     private func endSessions() {
         backgroundSession?.invalidate()
         backgroundSession = nil
-        if #available(iOS 18.0, *) {
-            (serviceSession as? CLServiceSession)?.invalidate()
-        }
+        serviceSession?.invalidate()
         serviceSession = nil
     }
 
     // MARK: - Updates
 
     private func handle(_ update: CLLocationUpdate) {
-        let stationary: Bool
-        if #available(iOS 18.0, *) {
-            stationary = update.stationary
-            noteDiagnostics(update)
-        } else {
-            stationary = update.isStationary
-        }
+        let stationary = update.stationary
+        noteDiagnostics(update)
         guard let location = update.location else { return }
 
         let decision = engine.process(GPSFix(location: location, stationary: stationary))
@@ -225,7 +216,6 @@ final class RunTracker: NSObject, ObservableObject {
         checkTargets(at: location.timestamp, notifyUser: true)
     }
 
-    @available(iOS 18.0, *)
     private func noteDiagnostics(_ update: CLLocationUpdate) {
         var message: String?
         if update.authorizationDenied || update.authorizationDeniedGlobally {
@@ -255,14 +245,12 @@ final class RunTracker: NSObject, ObservableObject {
                        body: "Jog Lock's distance hit your target. Note where you are.")
             }
         }
+        // The speed-based estimate isn't shown any more (it ran 4.6% short on
+        // the first real jog), but it is still logged for comparison.
         if !speedTargetReached && snapshot.speedMeters >= goal {
             speedTargetReached = true
             speedTargetAt = time
             logEvent("targetReached", detail: "speed")
-            if notifyUser {
-                notify(title: "Speed-based: \(Format.km(runTargetKm)) km",
-                       body: "The speed-based estimate hit your target too.")
-            }
         }
     }
 

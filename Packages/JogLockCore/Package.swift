@@ -8,7 +8,7 @@ import PackageDescription
 
 let package = Package(
     name: "JogLockCore",
-    platforms: [.iOS(.v17), .macOS(.v14)],
+    platforms: [.iOS(.v18), .macOS(.v14)],
     products: [
         .library(name: "JogLockCore", targets: ["JogLockCore"]),
     ],

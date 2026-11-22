@@ -1,6 +1,6 @@
 # Jog Tracker: Jog Lock distance test build (approach 1)
 
-This test app measures jog distance with Core Location's fitness updates, then cleans up the GPS points the way Strava does. It shows three distances side by side so you can see which one matches reality:
+This test app measures jog distance with Core Location's fitness updates, then cleans up the GPS points the way Strava does. It works out three distances so you can see which one matches reality. The app shows the cleaned and raw numbers; the speed-based one is only in the run files, because it came out 4.6% short on the first real jog.
 
 | Number | How it's worked out |
 |---|---|
@@ -14,7 +14,7 @@ There's no app blocking in this build, only the distance tracking.
 
 ## Put it on your iPhone
 
-You need Xcode 16 or later (Xcode 26 is fine) and an iPhone on iOS 17 or later.
+You need Xcode 16 or later (Xcode 26 is fine) and an iPhone on iOS 18 or later.
 
 1. Open `JogLockTracker.xcodeproj`.
 2. Click the **JogLockTracker** target, then open **Signing & Capabilities**.
@@ -104,7 +104,7 @@ These numbers come from a made-up noise model, so your jog decides which method 
 2. Replace its Swift files with the ones in `JogLockTracker/`, then add `Packages/JogLockCore` with **File > Add Package Dependencies… > Add Local…**.
 3. Copy the keys from `Config/Info.plist` into the target's **Info** tab.
 4. In **Signing & Capabilities**, add **Background Modes** and tick **Location updates**.
-5. Set **iOS Deployment Target** to 17.0.
+5. Set **iOS Deployment Target** to 18.0.
 
 ## Development
 
