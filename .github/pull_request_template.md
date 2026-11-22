@@ -16,7 +16,8 @@
 
 ## How it was verified
 
-- [ ] Python mirror tests: `python3 Tools/test_engine.py`
+- [ ] Swift tests: `swift test` in `Packages/JogLockCore`
+- [ ] Python mirror tests: `python3 Tools/test_engine.py && python3 Tools/test_stepgate.py && python3 Tools/test_treadmill.py`
 - [ ] App builds (CI job `ios-build`)
 - [ ] On a phone: <!-- what was run (jog, walk, treadmill), or why it isn't needed -->
 

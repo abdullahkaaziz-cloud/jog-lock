@@ -31,8 +31,24 @@ jobs:
         run: ruff check Tools
       - name: Format check
         run: ruff format --check Tools
-      - name: Engine mirror tests
-        run: python Tools/test_engine.py
+      - name: Engine and step-gate mirror tests
+        run: |
+          python Tools/test_engine.py
+          python Tools/test_stepgate.py
+          python Tools/test_treadmill.py
+
+  core:
+    name: Core package tests (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.2
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Swift version
+        run: swift --version
+      - name: Test
+        working-directory: Packages/JogLockCore
+        run: swift test
 
   ios-build:
     name: iOS app build (unsigned)

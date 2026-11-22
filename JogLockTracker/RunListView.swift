@@ -3,6 +3,7 @@
 //  JogLockTracker
 //
 
+import JogLockCore
 import SwiftUI
 
 struct RunListView: View {
@@ -26,7 +27,7 @@ struct RunListView: View {
             }
         }
         .navigationTitle("Runs")
-        .onAppear { runs = RunStore.allSummaries() }
+        .onAppear { runs = RunStore.onDevice.allSummaries() }
     }
 }
 
@@ -37,7 +38,7 @@ struct RunRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(run.startedAt.formatted(date: .abbreviated, time: .shortened))
                 .font(.headline)
-            Text("\(Format.km(run.cleanMeters / 1000)) km · speed \(Format.km(run.speedMeters / 1000)) · raw \(Format.km(run.rawMeters / 1000))")
+            Text(ContentView.lastRunLine(run))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
@@ -71,9 +72,21 @@ struct RunDetailView: View {
     var body: some View {
         Form {
             Section("Distance") {
-                distanceRow("Jog Lock (cleaned)", run.cleanMeters)
-                distanceRow("Speed-based", run.speedMeters)
-                distanceRow("Raw, no clean-up", run.rawMeters)
+                if run.mode == .treadmill {
+                    distanceRow("Counted (treadmill)", run.countedMeters ?? 0)
+                    distanceRow("Not counted: car, bike or still", run.rejectedMeters ?? 0)
+                } else {
+                    if let counted = run.countedMeters {
+                        distanceRow("Counted (steps checked)", counted)
+                        distanceRow("Not counted: too few steps", run.noStepsMeters ?? 0)
+                        distanceRow("Not counted: car or bike", run.vehicleMeters ?? 0)
+                    }
+                    distanceRow("GPS, cleaned", run.cleanMeters)
+                    distanceRow("GPS, raw", run.rawMeters)
+                }
+                if let steps = run.steps {
+                    LabeledContent("Steps", value: "\(steps)")
+                }
             }
 
             Section {
@@ -99,11 +112,11 @@ struct RunDetailView: View {
                 LabeledContent("Duration", value: Format.duration(run.endedAt.timeIntervalSince(run.startedAt)))
                 LabeledContent("Moving time", value: Format.duration(run.movingSeconds))
                 LabeledContent("Target", value: "\(Format.km(run.targetKm)) km")
-                if let at = run.cleanTargetAt {
-                    LabeledContent("Target hit (cleaned)", value: "after " + Format.duration(at.timeIntervalSince(run.startedAt)))
+                if let at = run.countedTargetAt {
+                    LabeledContent("Target hit (counted)", value: "after " + Format.duration(at.timeIntervalSince(run.startedAt)))
                 }
-                if let at = run.speedTargetAt {
-                    LabeledContent("Target hit (speed)", value: "after " + Format.duration(at.timeIntervalSince(run.startedAt)))
+                if let at = run.cleanTargetAt {
+                    LabeledContent("Target hit (GPS)", value: "after " + Format.duration(at.timeIntervalSince(run.startedAt)))
                 }
                 LabeledContent("GPS fixes", value: "\(run.fixCount)")
                 LabeledContent("Dropped", value: droppedText)
@@ -132,13 +145,13 @@ struct RunDetailView: View {
         }
         .navigationTitle(run.startedAt.formatted(date: .abbreviated, time: .shortened))
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { shareURLs = RunStore.shareableFiles(for: run.id) }
+        .onAppear { shareURLs = RunStore.onDevice.shareableFiles(for: run.id) }
         .onChange(of: stravaText) { saved = false }
         .onChange(of: trueText) { saved = false }
         .onChange(of: noteText) { saved = false }
         .confirmationDialog("Delete this run?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
-                RunStore.delete(id: run.id)
+                RunStore.onDevice.delete(id: run.id)
                 dismiss()
             }
         }
@@ -178,8 +191,8 @@ struct RunDetailView: View {
         run.stravaKm = Self.parseKm(stravaText)
         run.trueKm = Self.parseKm(trueText)
         run.note = noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : noteText
-        RunStore.save(run)
-        shareURLs = RunStore.shareableFiles(for: run.id)
+        try? RunStore.onDevice.save(run)
+        shareURLs = RunStore.onDevice.shareableFiles(for: run.id)
         saved = true
     }
 

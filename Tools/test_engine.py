@@ -12,7 +12,7 @@ import random
 import sys
 import tempfile
 
-from replay import Engine, Fix, Settings, distance_m, read_log, run_engine
+from replay import Engine, Fix, Settings, distance_m, read_log, run_engine, signed_pct
 from simulate import simulate
 
 FAILED = 0
@@ -261,6 +261,15 @@ def test_replay_parity_roundtrip():
     check("replay reproduces logged totals", abs(e2.clean - e.clean) < 1e-6, f"{e2.clean:.3f} vs {e.clean:.3f}")
 
 
+def test_signed_pct():
+    check("percent: +0.4% for 3012 m vs 3000 m", signed_pct(3012, 3000) == "+0.4%", signed_pct(3012, 3000))
+    check(
+        "percent: tiny shortfall shows +0.0%, not -0.0%",
+        signed_pct(2999.999, 3000) == "+0.0%",
+        signed_pct(2999.999, 3000),
+    )
+
+
 FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
 
 
@@ -302,6 +311,7 @@ if __name__ == "__main__":
         test_finalize_tail,
         test_replay_parity_roundtrip,
         test_run1_fixture,
+        test_signed_pct,
     ]:
         fn()
     print()

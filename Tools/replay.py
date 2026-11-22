@@ -24,6 +24,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, fields, replace
 from datetime import UTC, datetime
 
+from stepgate import GateSettings, StepGate, gate_settings_from_dict
+
 # ---------------------------------------------------------------------------
 # Geometry: local WGS84 radii (matches Geo.distance in Swift)
 # ---------------------------------------------------------------------------
@@ -139,10 +141,13 @@ class Engine:
         self._jump_streak = 0
         self._motion_t0 = -math.inf
         self.anchors: list[tuple[str, Fix]] = []  # for GPX of counted points
+        # (start, end, metres) of the distance the latest call counted, if any
+        self.last_segment: tuple[float, float, float] | None = None
 
     # -- public ------------------------------------------------------------
     def process(self, f: Fix) -> str:
         s = self.s
+        self.last_segment = None
         self.fix_count += 1
 
         # Raw estimator: every fix with a valid accuracy, from the first one.
@@ -230,6 +235,7 @@ class Engine:
             self.clean += d
             self.moving += dt_move
             self.accepted += 1
+            self.last_segment = (f.t - dt_move, f.t, d)
             self._anchor = f
             self.anchors.append(("point", f))
             return "accepted"
@@ -238,6 +244,7 @@ class Engine:
     def finalize(self) -> None:
         """Count the last partial segment when the run ends."""
         s = self.s
+        self.last_segment = None
         a, g = self._anchor, self._last_good
         if self.phase != "tracking" or self.paused or a is None or g is None or g.t <= a.t:
             return
@@ -245,7 +252,9 @@ class Engine:
         d = _dist(a, g)
         if dt <= s.max_gap and d / dt <= s.max_speed:
             self.clean += d
-            self.moving += max(0.0, g.t - max(a.t, self._motion_t0))
+            moved = max(0.0, g.t - max(a.t, self._motion_t0))
+            self.moving += moved
+            self.last_segment = (g.t - moved, g.t, d)
             self._anchor = g
             self.anchors.append(("point", g))
 
@@ -313,18 +322,61 @@ def read_log(path: str) -> RunLog:
             if kind == "header" and not header:
                 header = obj
             elif kind == "fix" and "lat" in obj and "lon" in obj:
-                fixes.append(
-                    Fix(
-                        t=float(obj["t"]),
-                        lat=float(obj["lat"]),
-                        lon=float(obj["lon"]),
-                        h_acc=float(obj.get("hAcc", -1)),
-                        speed=float(obj.get("speed", -1)),
-                        speed_acc=float(obj.get("speedAcc", -1)),
-                        stationary=bool(obj.get("stationary", False)),
-                    )
-                )
+                fixes.append(fix_from_line(obj))
     return RunLog(header, fixes, lines)
+
+
+def fix_from_line(obj: dict) -> Fix:
+    return Fix(
+        t=float(obj["t"]),
+        lat=float(obj["lat"]),
+        lon=float(obj["lon"]),
+        h_acc=float(obj.get("hAcc", -1)),
+        speed=float(obj.get("speed", -1)),
+        speed_acc=float(obj.get("speedAcc", -1)),
+        stationary=bool(obj.get("stationary", False)),
+    )
+
+
+def replay_gated(
+    lines: list[dict],
+    settings: Settings | None = None,
+    gate_settings: GateSettings | None = None,
+    finish: bool = True,
+    segments: list[tuple[float, float, float]] | None = None,
+) -> tuple[Engine, StepGate]:
+    """Engine + step gate, fed in log order. Mirror of RunCounter.replaying() + finish().
+
+    If `segments` is given, every counted (start, end, metres) is appended to it.
+    """
+    header = next((ln for ln in lines if ln.get("type") == "header"), {})
+    start = float(header.get("t", lines[0]["t"] if lines else 0))
+    e = Engine(settings or settings_from_dict(header.get("settings") or {}))
+    g = StepGate(start, gate_settings or gate_settings_from_dict(header.get("gate")))
+
+    def count_last():
+        if e.last_segment:
+            seg_start, seg_end, meters = e.last_segment
+            g.add_distance(meters, seg_start, seg_end)
+            if segments is not None:
+                segments.append(e.last_segment)
+
+    for ln in lines:
+        kind = ln.get("type")
+        if kind == "fix" and "lat" in ln and "lon" in ln:
+            e.process(fix_from_line(ln))
+            count_last()
+        elif kind == "steps" and "steps" in ln:
+            g.add_steps(float(ln["t"]), int(ln["steps"]))
+        elif kind == "motion" and "activity" in ln and "confidence" in ln:
+            g.add_motion(float(ln["t"]), ln["activity"], int(ln["confidence"]))
+        elif kind == "event" and ln.get("name") == "stop":
+            break
+    if finish:
+        e.finalize()
+        count_last()
+        g.finish()
+    return e, g
 
 
 def run_engine(fixes: Iterable[Fix], settings: Settings, finalize: bool = True) -> tuple[Engine, list[str]]:
@@ -400,10 +452,16 @@ def write_gpx(path: str, name: str, fixes: list[Fix], engine: Engine) -> None:
 # ---------------------------------------------------------------------------
 # Report
 # ---------------------------------------------------------------------------
+def signed_pct(value: float, ref: float) -> str:
+    """Signed percentage difference, e.g. +0.4%. Never shows -0.0%."""
+    text = f"{(value - ref) / ref * 100:+.1f}%"
+    return "+0.0%" if text == "-0.0%" else text
+
+
 def _pct(value: float, ref: float | None) -> str:
     if not ref:
         return ""
-    return f"  ({(value - ref) / ref * 100:+.1f}%)"
+    return f"  ({signed_pct(value, ref)})"
 
 
 def _fmt_dur(sec: float) -> str:
@@ -465,6 +523,22 @@ def report(
             status = "matches this replay" if diff < 0.5 else f"DIFFERS from this replay by {diff:.1f} m"
             print(f"  Phone's own clean total: {phone_clean / 1000:.3f} km ({status})")
 
+    gated = log.header.get("gate") is not None or any(ln.get("type") == "steps" for ln in log.lines)
+    if gated:
+        print()
+        print("Step check (anti-cheat)")
+        _, g = replay_gated(log.lines, settings)
+        print(f"  {'Counted':<19} {g.counted / 1000:7.3f} km   ({g.steps} steps)")
+        print(
+            f"  {'Not counted':<19} {(g.no_steps + g.vehicle) / 1000:7.3f} km   "
+            f"(too few steps {g.no_steps:.0f} m, car or bike {g.vehicle:.0f} m)"
+        )
+        stop = next((ln for ln in log.lines if ln.get("type") == "event" and ln.get("name") == "stop"), None)
+        if compare_phone and stop is not None and stop.get("counted") is not None:
+            diff = abs(stop["counted"] - g.counted)
+            status = "matches this replay" if diff < 0.5 else f"DIFFERS from this replay by {diff:.1f} m"
+            print(f"  Phone's own counted total: {stop['counted'] / 1000:.3f} km ({status})")
+
     print()
     print("Experiments (replay only, not in the app yet)")
     for mode, label in (("ema0.5", "Clean + live smoothing"), ("center3", "Clean + centred smoothing")):
@@ -520,7 +594,7 @@ def sweep(log: RunLog, base: Settings, true_km: float | None) -> None:
             tag = f"{v:g}"
             val = f"{e.clean / 1000:.3f}/{e.speed_dist / 1000:.3f}"
             if true_m:
-                val += f" ({(e.clean - true_m) / true_m * 100:+.1f}%)"
+                val += f" ({signed_pct(e.clean, true_m)})"
             mark = "*" if getattr(base, name) == v else " "
             parts.append(f"{mark}{tag}: {val}")
         print(f"  {name}:")
@@ -539,6 +613,28 @@ def _read_summary_notes(log_path: str) -> dict:
         return {k: data[k] for k in ("trueKm", "stravaKm") if data.get(k)}
     except (OSError, ValueError):
         return {}
+
+
+def treadmill_report(log: RunLog) -> int:
+    from treadmill import StrideModel, replay_treadmill  # treadmill.py imports this module
+
+    c = replay_treadmill(log.lines)
+    model = StrideModel.from_dict(log.header.get("stride"))
+    print("Treadmill run")
+    if model:
+        print(
+            f"  Stride model         {model.step_length(2.7):.2f} m a step at 162 steps/min ({model.samples} windows)"
+        )
+    else:
+        print("  Stride model         none (the iPhone's pedometer distance was used)")
+    print(f"  {'Counted':<20} {c.counted / 1000:7.3f} km   ({c.steps} steps)")
+    print(f"  {'Not counted':<20} {c.rejected / 1000:7.3f} km   (car, bike or standing still)")
+    stop = next((ln for ln in log.lines if ln.get("type") == "event" and ln.get("name") == "stop"), None)
+    if stop is not None and stop.get("counted") is not None:
+        diff = abs(stop["counted"] - c.counted)
+        status = "matches this replay" if diff < 0.5 else f"DIFFERS from this replay by {diff:.1f} m"
+        print(f"  Phone's own counted total: {stop['counted'] / 1000:.3f} km ({status})")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -563,6 +659,8 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     log = read_log(args.log)
+    if log.header.get("mode") == "treadmill":
+        return treadmill_report(log)
     if not log.fixes:
         print("No fixes in this log.", file=sys.stderr)
         return 1

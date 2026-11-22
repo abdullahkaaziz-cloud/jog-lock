@@ -3,6 +3,7 @@
 //  JogLockTracker
 //
 
+import JogLockCore
 import SwiftUI
 
 struct ContentView: View {
@@ -24,15 +25,19 @@ struct ContentView: View {
                         Banner(text: diagnostic, systemImage: "location.slash.fill", tint: .red, onClose: nil)
                     }
 
-                    DistanceRing(meters: tracker.snapshot.cleanMeters,
+                    DistanceRing(meters: tracker.gateTotals.countedMeters + tracker.gateTotals.pendingMeters,
                                  targetKm: tracker.isActive ? tracker.runTargetKm : tracker.targetKm,
-                                 reached: tracker.cleanTargetReached && tracker.isActive)
+                                 reached: tracker.countedTargetReached && tracker.isActive)
 
                     statsRow
                     comparisonCard
 
                     if !tracker.isActive {
+                        modePicker
                         targetStepper
+                        if tracker.mode == .treadmill {
+                            treadmillCard
+                        }
                     }
 
                     controlButton
@@ -92,7 +97,7 @@ struct ContentView: View {
             }
             return "Getting GPS…"
         case .tracking:
-            return "Tracking - go!"
+            return tracker.runMode == .treadmill ? "Counting steps - keep the phone on you" : "Tracking - go!"
         case .paused:
             return "Paused - standing still"
         }
@@ -113,31 +118,60 @@ struct ContentView: View {
                 StatTile(title: "Time", value: elapsedText(at: context.date))
             }
             StatTile(title: "Pace /km", value: paceText)
-            StatTile(title: "GPS accuracy", value: accuracyText)
+            if tracker.isActive && tracker.runMode == .treadmill {
+                StatTile(title: "Steps/min", value: tracker.lastCadence.map { "\(Int(($0 * 60).rounded()))" } ?? "--")
+            } else {
+                StatTile(title: "GPS accuracy", value: accuracyText)
+            }
         }
     }
 
     private var comparisonCard: some View {
         let s = tracker.snapshot
+        let g = tracker.gateTotals
+        let treadmillRun = tracker.runMode == .treadmill && (tracker.isActive || tracker.lastFinishedRun != nil)
         return VStack(alignment: .leading, spacing: 10) {
-            Text("Same run, three ways")
+            Text("Distance")
                 .font(.headline)
-            CompareRow(label: "Jog Lock (cleaned)", meters: s.cleanMeters, emphasised: true)
-            CompareRow(label: "Speed-based", meters: s.speedMeters, emphasised: false)
-            CompareRow(label: "Raw, no clean-up", meters: s.rawMeters, emphasised: false)
+            CompareRow(label: "Counted (steps checked)", meters: g.countedMeters, emphasised: true)
+            if g.pendingMeters > 0 {
+                CompareRow(label: "Checking steps", meters: g.pendingMeters, emphasised: false)
+            }
+            if g.noStepsMeters > 0 {
+                CompareRow(label: "Not counted: too few steps", meters: g.noStepsMeters, emphasised: false)
+            }
+            if g.vehicleMeters > 0 {
+                CompareRow(label: treadmillRun ? "Not counted: car, bike or still" : "Not counted: car or bike",
+                           meters: g.vehicleMeters, emphasised: false)
+            }
+            if !treadmillRun {
+                Divider()
+                CompareRow(label: "GPS, cleaned", meters: s.cleanMeters, emphasised: false)
+                CompareRow(label: "GPS, raw", meters: s.rawMeters, emphasised: false)
+            }
             Divider()
             HStack {
-                Text("GPS fixes")
+                Text("Steps")
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("\(s.fixCount) received · \(droppedCount(s)) dropped")
+                Text("\(g.steps)")
                     .monospacedDigit()
             }
             .font(.footnote)
-            if !s.rejected.isEmpty {
-                Text(droppedBreakdown(s))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            if !treadmillRun {
+                HStack {
+                    Text("GPS fixes")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(s.fixCount) received · \(droppedCount(s)) dropped")
+                        .monospacedDigit()
+                }
+                .font(.footnote)
+                if !s.rejected.isEmpty {
+                    Text(droppedBreakdown(s))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding()
@@ -193,7 +227,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Last run")
                         .font(.headline)
-                    Text("\(Format.km(run.cleanMeters / 1000)) km cleaned · \(Format.km(run.speedMeters / 1000)) speed · \(Format.km(run.rawMeters / 1000)) raw")
+                    Text(Self.lastRunLine(run))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -209,6 +243,46 @@ struct ContentView: View {
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
+    }
+
+    static func lastRunLine(_ run: RunSummary) -> String {
+        if run.mode == .treadmill {
+            return "\(Format.km((run.countedMeters ?? 0) / 1000)) km counted · treadmill"
+        }
+        guard let counted = run.countedMeters else {
+            return "\(Format.km(run.cleanMeters / 1000)) km cleaned · \(Format.km(run.rawMeters / 1000)) raw"
+        }
+        return "\(Format.km(counted / 1000)) km counted · \(Format.km(run.cleanMeters / 1000)) km GPS"
+    }
+
+    private var modePicker: some View {
+        Picker("Where", selection: $tracker.mode) {
+            Text("Outdoor (GPS)").tag(RunMode.outdoor)
+            Text("Treadmill").tag(RunMode.treadmill)
+        }
+        .pickerStyle(.segmented)
+    }
+
+    private var treadmillCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Keep the phone on you", systemImage: "figure.run")
+                .font(.headline)
+            Text("Put it in a pocket or an armband. On the treadmill's console it can't count your steps.")
+            Text(strideText)
+        }
+        .font(.footnote)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private var strideText: String {
+        guard let model = tracker.strideModel else {
+            return "Distance comes from the iPhone's own step estimate until you've done an outdoor run with Jog Lock. Then it uses your own stride."
+        }
+        let typical = (model.minCadence + model.maxCadence) / 2
+        let length = model.stepLength(cadence: typical)
+        return "Your stride, learned on GPS runs: \(String(format: "%.2f", length)) m a step at \(Int((typical * 60).rounded())) steps a minute."
     }
 
     private var howToCard: some View {
@@ -229,8 +303,9 @@ struct ContentView: View {
     // MARK: - Formatting
 
     private func elapsedText(at date: Date) -> String {
-        guard tracker.isActive, let start = tracker.startedAt else { return "0:00" }
-        return Format.duration(date.timeIntervalSince(start))
+        Format.elapsed(now: date,
+                       activeSince: tracker.isActive ? tracker.startedAt : nil,
+                       lastRun: tracker.lastFinishedRun)
     }
 
     private var paceText: String {
@@ -291,6 +366,9 @@ struct DistanceRing: View {
         }
         .frame(width: 260, height: 260)
         .padding(.vertical, 8)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Distance")
+        .accessibilityValue("\(Format.km(meters / 1000)) of \(Format.km(targetKm)) kilometres. \(reached ? "Apps unlocked" : "Apps locked")")
     }
 }
 
@@ -312,6 +390,9 @@ struct StatTile: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(value)
     }
 }
 
@@ -329,6 +410,9 @@ struct CompareRow: View {
                 .monospacedDigit()
                 .fontWeight(emphasised ? .semibold : .regular)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(String(format: "%.3f kilometres", meters / 1000))
     }
 }
 
@@ -342,6 +426,7 @@ struct Banner: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: systemImage)
                 .foregroundStyle(tint)
+                .accessibilityHidden(true)
             Text(text)
                 .font(.footnote)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -352,40 +437,11 @@ struct Banner: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss")
             }
         }
         .padding(12)
         .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-enum Format {
-    static func km(_ value: Double) -> String {
-        String(format: "%.2f", value)
-    }
-
-    static func duration(_ seconds: Double) -> String {
-        guard seconds.isFinite, seconds >= 0 else { return "--" }
-        let total = Int(seconds.rounded())
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let s = total % 60
-        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
-    }
-
-    static func reason(_ key: String) -> String {
-        switch key {
-        case FixDecision.rejectedLowAccuracy.rawValue: return "weak signal"
-        case FixDecision.rejectedJump.rawValue: return "jumps"
-        case FixDecision.rejectedOutOfOrder.rawValue: return "duplicates"
-        case FixDecision.rejectedInvalid.rawValue: return "invalid"
-        default: return key
-        }
-    }
-
-    static func percent(_ value: Double, versus reference: Double) -> String {
-        guard reference > 0 else { return "" }
-        return String(format: "%+.1f%%", (value - reference) / reference * 100)
     }
 }
 
