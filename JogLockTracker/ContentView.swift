@@ -25,9 +25,9 @@ struct ContentView: View {
                         Banner(text: diagnostic, systemImage: "location.slash.fill", tint: .red, onClose: nil)
                     }
 
-                    DistanceRing(meters: tracker.snapshot.cleanMeters,
+                    DistanceRing(meters: tracker.gateTotals.countedMeters + tracker.gateTotals.pendingMeters,
                                  targetKm: tracker.isActive ? tracker.runTargetKm : tracker.targetKm,
-                                 reached: tracker.cleanTargetReached && tracker.isActive)
+                                 reached: tracker.countedTargetReached && tracker.isActive)
 
                     statsRow
                     comparisonCard
@@ -120,12 +120,32 @@ struct ContentView: View {
 
     private var comparisonCard: some View {
         let s = tracker.snapshot
+        let g = tracker.gateTotals
         return VStack(alignment: .leading, spacing: 10) {
-            Text("Same run, two ways")
+            Text("Distance")
                 .font(.headline)
-            CompareRow(label: "Jog Lock (cleaned)", meters: s.cleanMeters, emphasised: true)
-            CompareRow(label: "Raw, no clean-up", meters: s.rawMeters, emphasised: false)
+            CompareRow(label: "Counted (steps checked)", meters: g.countedMeters, emphasised: true)
+            if g.pendingMeters > 0 {
+                CompareRow(label: "Checking steps", meters: g.pendingMeters, emphasised: false)
+            }
+            if g.noStepsMeters > 0 {
+                CompareRow(label: "Not counted: too few steps", meters: g.noStepsMeters, emphasised: false)
+            }
+            if g.vehicleMeters > 0 {
+                CompareRow(label: "Not counted: car or bike", meters: g.vehicleMeters, emphasised: false)
+            }
             Divider()
+            CompareRow(label: "GPS, cleaned", meters: s.cleanMeters, emphasised: false)
+            CompareRow(label: "GPS, raw", meters: s.rawMeters, emphasised: false)
+            Divider()
+            HStack {
+                Text("Steps")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("\(g.steps)")
+                    .monospacedDigit()
+            }
+            .font(.footnote)
             HStack {
                 Text("GPS fixes")
                     .foregroundStyle(.secondary)
@@ -193,7 +213,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Last run")
                         .font(.headline)
-                    Text("\(Format.km(run.cleanMeters / 1000)) km cleaned · \(Format.km(run.rawMeters / 1000)) raw")
+                    Text(Self.lastRunLine(run))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -209,6 +229,13 @@ struct ContentView: View {
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
+    }
+
+    static func lastRunLine(_ run: RunSummary) -> String {
+        guard let counted = run.countedMeters else {
+            return "\(Format.km(run.cleanMeters / 1000)) km cleaned · \(Format.km(run.rawMeters / 1000)) raw"
+        }
+        return "\(Format.km(counted / 1000)) km counted · \(Format.km(run.cleanMeters / 1000)) km GPS"
     }
 
     private var howToCard: some View {
