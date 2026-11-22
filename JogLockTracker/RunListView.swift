@@ -3,6 +3,7 @@
 //  JogLockTracker
 //
 
+import JogLockCore
 import SwiftUI
 
 struct RunListView: View {
@@ -26,7 +27,7 @@ struct RunListView: View {
             }
         }
         .navigationTitle("Runs")
-        .onAppear { runs = RunStore.allSummaries() }
+        .onAppear { runs = RunStore.onDevice.allSummaries() }
     }
 }
 
@@ -132,13 +133,13 @@ struct RunDetailView: View {
         }
         .navigationTitle(run.startedAt.formatted(date: .abbreviated, time: .shortened))
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { shareURLs = RunStore.shareableFiles(for: run.id) }
+        .onAppear { shareURLs = RunStore.onDevice.shareableFiles(for: run.id) }
         .onChange(of: stravaText) { saved = false }
         .onChange(of: trueText) { saved = false }
         .onChange(of: noteText) { saved = false }
         .confirmationDialog("Delete this run?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
-                RunStore.delete(id: run.id)
+                RunStore.onDevice.delete(id: run.id)
                 dismiss()
             }
         }
@@ -178,8 +179,8 @@ struct RunDetailView: View {
         run.stravaKm = Self.parseKm(stravaText)
         run.trueKm = Self.parseKm(trueText)
         run.note = noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : noteText
-        RunStore.save(run)
-        shareURLs = RunStore.shareableFiles(for: run.id)
+        try? RunStore.onDevice.save(run)
+        shareURLs = RunStore.onDevice.shareableFiles(for: run.id)
         saved = true
     }
 
