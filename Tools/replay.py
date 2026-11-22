@@ -400,10 +400,16 @@ def write_gpx(path: str, name: str, fixes: list[Fix], engine: Engine) -> None:
 # ---------------------------------------------------------------------------
 # Report
 # ---------------------------------------------------------------------------
+def signed_pct(value: float, ref: float) -> str:
+    """Signed percentage difference, e.g. +0.4%. Never shows -0.0%."""
+    text = f"{(value - ref) / ref * 100:+.1f}%"
+    return "+0.0%" if text == "-0.0%" else text
+
+
 def _pct(value: float, ref: float | None) -> str:
     if not ref:
         return ""
-    return f"  ({(value - ref) / ref * 100:+.1f}%)"
+    return f"  ({signed_pct(value, ref)})"
 
 
 def _fmt_dur(sec: float) -> str:
@@ -520,7 +526,7 @@ def sweep(log: RunLog, base: Settings, true_km: float | None) -> None:
             tag = f"{v:g}"
             val = f"{e.clean / 1000:.3f}/{e.speed_dist / 1000:.3f}"
             if true_m:
-                val += f" ({(e.clean - true_m) / true_m * 100:+.1f}%)"
+                val += f" ({signed_pct(e.clean, true_m)})"
             mark = "*" if getattr(base, name) == v else " "
             parts.append(f"{mark}{tag}: {val}")
         print(f"  {name}:")

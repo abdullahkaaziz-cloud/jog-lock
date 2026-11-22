@@ -230,8 +230,9 @@ struct ContentView: View {
     // MARK: - Formatting
 
     private func elapsedText(at date: Date) -> String {
-        guard tracker.isActive, let start = tracker.startedAt else { return "0:00" }
-        return Format.duration(date.timeIntervalSince(start))
+        Format.elapsed(now: date,
+                       activeSince: tracker.isActive ? tracker.startedAt : nil,
+                       lastRun: tracker.lastFinishedRun)
     }
 
     private var paceText: String {

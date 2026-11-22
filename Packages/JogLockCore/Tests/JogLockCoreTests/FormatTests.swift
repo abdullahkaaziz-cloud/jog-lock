@@ -32,4 +32,23 @@ struct FormatTests {
         #expect(Format.percent(2_863, versus: 3_000) == "-4.6%")
         #expect(Format.percent(1, versus: 0) == "")
     }
+
+    @Test("A difference too small to show is +0.0%, never -0.0%")
+    func percentNegativeZero() {
+        #expect(Format.percent(2_999.999, versus: 3_000) == "+0.0%")
+        #expect(Format.percent(3_000.001, versus: 3_000) == "+0.0%")
+    }
+
+    @Test("The Time tile keeps a finished run's length instead of going back to 0:00")
+    func elapsed() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let run = RunSummary(id: "run-a", startedAt: start, endedAt: start.addingTimeInterval(1_260),
+                             targetKm: 2.5, cleanMeters: 3_012, speedMeters: 2_863, rawMeters: 3_048,
+                             movingSeconds: 1_243, fixCount: 1_264, acceptedCount: 512, rejected: [:],
+                             device: "iPhone17,5", os: "27.0", appVersion: "0.1 (1)", settings: .standard)
+        let later = start.addingTimeInterval(5_000)
+        #expect(Format.elapsed(now: later, activeSince: nil, lastRun: run) == "21:00")
+        #expect(Format.elapsed(now: start.addingTimeInterval(90), activeSince: start, lastRun: run) == "1:30")
+        #expect(Format.elapsed(now: later, activeSince: nil, lastRun: nil) == "0:00")
+    }
 }

@@ -33,6 +33,19 @@ public enum Format {
 
     public static func percent(_ value: Double, versus reference: Double) -> String {
         guard reference > 0 else { return "" }
-        return String(format: "%+.1f%%", (value - reference) / reference * 100)
+        let text = String(format: "%+.1f%%", (value - reference) / reference * 100)
+        return text == "-0.0%" ? "+0.0%" : text
+    }
+
+    /// The Time tile: the clock while a run is going, the finished run's
+    /// length after it ends, and 0:00 before the first run.
+    public static func elapsed(now: Date, activeSince start: Date?, lastRun: RunSummary?) -> String {
+        if let start {
+            return duration(now.timeIntervalSince(start))
+        }
+        if let run = lastRun {
+            return duration(run.endedAt.timeIntervalSince(run.startedAt))
+        }
+        return "0:00"
     }
 }
