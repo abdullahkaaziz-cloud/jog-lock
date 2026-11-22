@@ -24,6 +24,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, fields, replace
 from datetime import UTC, datetime
 
+from stepgate import GateSettings, StepGate, gate_settings_from_dict
+
 # ---------------------------------------------------------------------------
 # Geometry: local WGS84 radii (matches Geo.distance in Swift)
 # ---------------------------------------------------------------------------
@@ -139,10 +141,13 @@ class Engine:
         self._jump_streak = 0
         self._motion_t0 = -math.inf
         self.anchors: list[tuple[str, Fix]] = []  # for GPX of counted points
+        # (start, end, metres) of the distance the latest call counted, if any
+        self.last_segment: tuple[float, float, float] | None = None
 
     # -- public ------------------------------------------------------------
     def process(self, f: Fix) -> str:
         s = self.s
+        self.last_segment = None
         self.fix_count += 1
 
         # Raw estimator: every fix with a valid accuracy, from the first one.
@@ -230,6 +235,7 @@ class Engine:
             self.clean += d
             self.moving += dt_move
             self.accepted += 1
+            self.last_segment = (f.t - dt_move, f.t, d)
             self._anchor = f
             self.anchors.append(("point", f))
             return "accepted"
@@ -238,6 +244,7 @@ class Engine:
     def finalize(self) -> None:
         """Count the last partial segment when the run ends."""
         s = self.s
+        self.last_segment = None
         a, g = self._anchor, self._last_good
         if self.phase != "tracking" or self.paused or a is None or g is None or g.t <= a.t:
             return
@@ -245,7 +252,9 @@ class Engine:
         d = _dist(a, g)
         if dt <= s.max_gap and d / dt <= s.max_speed:
             self.clean += d
-            self.moving += max(0.0, g.t - max(a.t, self._motion_t0))
+            moved = max(0.0, g.t - max(a.t, self._motion_t0))
+            self.moving += moved
+            self.last_segment = (g.t - moved, g.t, d)
             self._anchor = g
             self.anchors.append(("point", g))
 
@@ -313,18 +322,52 @@ def read_log(path: str) -> RunLog:
             if kind == "header" and not header:
                 header = obj
             elif kind == "fix" and "lat" in obj and "lon" in obj:
-                fixes.append(
-                    Fix(
-                        t=float(obj["t"]),
-                        lat=float(obj["lat"]),
-                        lon=float(obj["lon"]),
-                        h_acc=float(obj.get("hAcc", -1)),
-                        speed=float(obj.get("speed", -1)),
-                        speed_acc=float(obj.get("speedAcc", -1)),
-                        stationary=bool(obj.get("stationary", False)),
-                    )
-                )
+                fixes.append(fix_from_line(obj))
     return RunLog(header, fixes, lines)
+
+
+def fix_from_line(obj: dict) -> Fix:
+    return Fix(
+        t=float(obj["t"]),
+        lat=float(obj["lat"]),
+        lon=float(obj["lon"]),
+        h_acc=float(obj.get("hAcc", -1)),
+        speed=float(obj.get("speed", -1)),
+        speed_acc=float(obj.get("speedAcc", -1)),
+        stationary=bool(obj.get("stationary", False)),
+    )
+
+
+def replay_gated(
+    lines: list[dict], settings: Settings | None = None, gate_settings: GateSettings | None = None, finish: bool = True
+) -> tuple[Engine, StepGate]:
+    """Engine + step gate, fed in log order. Mirror of RunCounter.replaying() + finish()."""
+    header = next((ln for ln in lines if ln.get("type") == "header"), {})
+    start = float(header.get("t", lines[0]["t"] if lines else 0))
+    e = Engine(settings or settings_from_dict(header.get("settings") or {}))
+    g = StepGate(start, gate_settings or gate_settings_from_dict(header.get("gate")))
+
+    def count_last():
+        if e.last_segment:
+            seg_start, seg_end, meters = e.last_segment
+            g.add_distance(meters, seg_start, seg_end)
+
+    for ln in lines:
+        kind = ln.get("type")
+        if kind == "fix" and "lat" in ln and "lon" in ln:
+            e.process(fix_from_line(ln))
+            count_last()
+        elif kind == "steps" and "steps" in ln:
+            g.add_steps(float(ln["t"]), int(ln["steps"]))
+        elif kind == "motion" and "activity" in ln and "confidence" in ln:
+            g.add_motion(float(ln["t"]), ln["activity"], int(ln["confidence"]))
+        elif kind == "event" and ln.get("name") == "stop":
+            break
+    if finish:
+        e.finalize()
+        count_last()
+        g.finish()
+    return e, g
 
 
 def run_engine(fixes: Iterable[Fix], settings: Settings, finalize: bool = True) -> tuple[Engine, list[str]]:
@@ -470,6 +513,22 @@ def report(
             diff = abs(phone_clean - mine)
             status = "matches this replay" if diff < 0.5 else f"DIFFERS from this replay by {diff:.1f} m"
             print(f"  Phone's own clean total: {phone_clean / 1000:.3f} km ({status})")
+
+    gated = log.header.get("gate") is not None or any(ln.get("type") == "steps" for ln in log.lines)
+    if gated:
+        print()
+        print("Step check (anti-cheat)")
+        _, g = replay_gated(log.lines, settings)
+        print(f"  {'Counted':<19} {g.counted / 1000:7.3f} km   ({g.steps} steps)")
+        print(
+            f"  {'Not counted':<19} {(g.no_steps + g.vehicle) / 1000:7.3f} km   "
+            f"(too few steps {g.no_steps:.0f} m, car or bike {g.vehicle:.0f} m)"
+        )
+        stop = next((ln for ln in log.lines if ln.get("type") == "event" and ln.get("name") == "stop"), None)
+        if compare_phone and stop is not None and stop.get("counted") is not None:
+            diff = abs(stop["counted"] - g.counted)
+            status = "matches this replay" if diff < 0.5 else f"DIFFERS from this replay by {diff:.1f} m"
+            print(f"  Phone's own counted total: {stop['counted'] / 1000:.3f} km ({status})")
 
     print()
     print("Experiments (replay only, not in the app yet)")
