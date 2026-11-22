@@ -25,8 +25,8 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 
 
 def to_fixes(lines):
-    return [Fix(l["t"], l["lat"], l["lon"], l["hAcc"], l["speed"], l["speedAcc"], l["stationary"])
-            for l in lines if l["type"] == "fix"]
+    return [Fix(ln["t"], ln["lat"], ln["lon"], ln["hAcc"], ln["speed"], ln["speedAcc"], ln["stationary"])
+            for ln in lines if ln["type"] == "fix"]
 
 
 def run(kind, seed=1, settings=None):
@@ -162,13 +162,13 @@ def test_urban():
 
 
 def test_drive_counts_nothing():
-    e, dec, _ = run("drive", 1)
+    e, _dec, _ = run("drive", 1)
     check("driving at 14 m/s counts ~0 m", e.clean < 30, f"clean {e.clean:.1f} m, raw {e.raw:.0f} m")
     check("speed-based ignores driving", e.speed_dist < 30, f"{e.speed_dist:.1f} m")
 
 
 def test_warmup_gate():
-    e, dec, _ = run("track", 5)
+    _e, dec, _ = run("track", 5)
     first = dec.index("warmupComplete")
     check("warm-up waits for good fixes", first >= 5, f"tracking began at fix {first}")
 

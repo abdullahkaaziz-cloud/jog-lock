@@ -195,7 +195,7 @@ def simulate(kind: str, seed: int = 1) -> tuple[list[dict], float]:
         true_m = 0.0  # nothing should count as jogging
     elif kind in ("standstill", "standstill_nospeed"):
         x, y = path(0.0)
-        for k in range(300):  # 5 minutes standing, iOS never flags stationary
+        for _ in range(300):  # 5 minutes standing, iOS never flags stationary
             add(x, y, 0.0, stationary=False, noise_obj=noise, err=err, no_speed=(kind == "standstill_nospeed"))
             t += 1.0
         true_m = 0.0

@@ -14,13 +14,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import math
 import statistics
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass, fields, replace
-from datetime import datetime, timezone
-from typing import Iterable, Optional
+from datetime import UTC, datetime
 
 # ---------------------------------------------------------------------------
 # Geometry: local WGS84 radii (matches Geo.distance in Swift)
@@ -100,7 +101,8 @@ SWIFT_KEYS = {
 INT_FIELDS = {"warmup_fixes", "jump_reset_count"}
 
 
-def settings_from_dict(d: dict, base: Settings = Settings()) -> Settings:
+def settings_from_dict(d: dict, base: Settings | None = None) -> Settings:
+    base = base or Settings()
     changes = {}
     for k, v in d.items():
         name = SWIFT_KEYS.get(k, k)
@@ -116,7 +118,7 @@ def settings_to_swift_dict(s: Settings) -> dict:
 
 
 class Engine:
-    def __init__(self, settings: Optional[Settings] = None):
+    def __init__(self, settings: Settings | None = None):
         self.s = settings or Settings()
         self.phase = "warmingUp"
         self.clean = 0.0
@@ -128,11 +130,11 @@ class Engine:
         self.rejected: dict[str, int] = {}
         self.paused = False
         self._good_streak = 0
-        self._anchor: Optional[Fix] = None
-        self._last_seen: Optional[Fix] = None
-        self._last_good: Optional[Fix] = None
-        self._raw_last: Optional[Fix] = None
-        self._speed_last: Optional[Fix] = None
+        self._anchor: Fix | None = None
+        self._last_seen: Fix | None = None
+        self._last_good: Fix | None = None
+        self._raw_last: Fix | None = None
+        self._speed_last: Fix | None = None
         self._jump_streak = 0
         self._motion_t0 = -math.inf
         self.anchors: list[tuple[str, Fix]] = []  # for GPX of counted points
@@ -296,7 +298,7 @@ def read_log(path: str) -> RunLog:
     header: dict = {}
     fixes: list[Fix] = []
     lines: list[dict] = []
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, encoding="utf-8") as fh:
         for n, raw_line in enumerate(fh, 1):
             raw_line = raw_line.strip()
             if not raw_line:
@@ -341,7 +343,7 @@ def smoothed(fixes: list[Fix], mode: str) -> list[Fix]:
     out: list[Fix] = []
     if mode.startswith("ema"):
         alpha = float(mode[3:])
-        prev: Optional[Fix] = None
+        prev: Fix | None = None
         for f in fixes:
             if prev is not None and 0 <= f.h_acc and f.t - prev.t <= 3 and 0 <= prev.h_acc:
                 f = replace(f, lat=alpha * f.lat + (1 - alpha) * prev.lat,
@@ -364,7 +366,7 @@ def smoothed(fixes: list[Fix], mode: str) -> list[Fix]:
 # GPX
 # ---------------------------------------------------------------------------
 def _iso(t: float) -> str:
-    return datetime.fromtimestamp(t, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    return datetime.fromtimestamp(t, tz=UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
 def write_gpx(path: str, name: str, fixes: list[Fix], engine: Engine) -> None:
@@ -395,20 +397,20 @@ def write_gpx(path: str, name: str, fixes: list[Fix], engine: Engine) -> None:
 # ---------------------------------------------------------------------------
 # Report
 # ---------------------------------------------------------------------------
-def _pct(value: float, ref: Optional[float]) -> str:
+def _pct(value: float, ref: float | None) -> str:
     if not ref:
         return ""
     return f"  ({(value - ref) / ref * 100:+.1f}%)"
 
 
 def _fmt_dur(sec: float) -> str:
-    sec = int(round(sec))
+    sec = round(sec)
     h, rem = divmod(sec, 3600)
     m, s = divmod(rem, 60)
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 
-def report(log: RunLog, settings: Settings, true_km: Optional[float], strava_km: Optional[float],
+def report(log: RunLog, settings: Settings, true_km: float | None, strava_km: float | None,
            compare_phone: bool = True) -> Engine:
     e, decisions = run_engine(log.fixes, settings)
     fixes = log.fixes
@@ -475,7 +477,7 @@ def report(log: RunLog, settings: Settings, true_km: Optional[float], strava_km:
         print(f"GPS accuracy: median {statistics.median(h):.1f} m, p90 {p90:.1f} m, worst {max(h):.1f} m")
     if sa:
         print(f"Speed accuracy: median {statistics.median(sa):.2f} m/s")
-    gaps = [b.t - a.t for a, b in zip(fixes, fixes[1:]) if b.t - a.t > 5]
+    gaps = [b.t - a.t for a, b in itertools.pairwise(fixes) if b.t - a.t > 5]
     if gaps:
         print(f"Gaps > 5 s: {len(gaps)} (longest {max(gaps):.0f} s)")
     stationary_n = sum(1 for f in fixes if f.stationary)
@@ -493,7 +495,7 @@ SWEEPS = {
 }
 
 
-def sweep(log: RunLog, base: Settings, true_km: Optional[float]) -> None:
+def sweep(log: RunLog, base: Settings, true_km: float | None) -> None:
     true_m = true_km * 1000 if true_km else None
     print()
     print("Sensitivity (one setting changed at a time; clean / speed-based km)")
@@ -518,14 +520,14 @@ def _read_summary_notes(log_path: str) -> dict:
     import os
     path = os.path.join(os.path.dirname(os.path.abspath(log_path)), "summary.json")
     try:
-        with open(path, "r", encoding="utf-8") as fh:
+        with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
         return {k: data[k] for k in ("trueKm", "stravaKm") if data.get(k)}
     except (OSError, ValueError):
         return {}
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("log", help="raw.jsonl exported from the app")
     ap.add_argument("--true-km", type=float, help="measured true distance in km")
