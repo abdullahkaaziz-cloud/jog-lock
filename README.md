@@ -14,7 +14,7 @@ There's no app blocking in this build, only the distance tracking.
 
 ## Put it on your iPhone
 
-You need Xcode 16 or later (Xcode 26 is fine) and an iPhone on iOS 17 or later.
+You need Xcode 16 or later (Xcode 26 is fine) and an iPhone on iOS 18 or later.
 
 1. Open `JogLockTracker.xcodeproj`.
 2. Click the **JogLockTracker** target, then open **Signing & Capabilities**.
@@ -104,7 +104,7 @@ These numbers come from a made-up noise model, so your jog decides which method 
 2. Replace its Swift files with the ones in `JogLockTracker/`, then add `Packages/JogLockCore` with **File > Add Package Dependencies… > Add Local…**.
 3. Copy the keys from `Config/Info.plist` into the target's **Info** tab.
 4. In **Signing & Capabilities**, add **Background Modes** and tick **Location updates**.
-5. Set **iOS Deployment Target** to 17.0.
+5. Set **iOS Deployment Target** to 18.0.
 
 ## Development
 
