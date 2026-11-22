@@ -339,9 +339,16 @@ def fix_from_line(obj: dict) -> Fix:
 
 
 def replay_gated(
-    lines: list[dict], settings: Settings | None = None, gate_settings: GateSettings | None = None, finish: bool = True
+    lines: list[dict],
+    settings: Settings | None = None,
+    gate_settings: GateSettings | None = None,
+    finish: bool = True,
+    segments: list[tuple[float, float, float]] | None = None,
 ) -> tuple[Engine, StepGate]:
-    """Engine + step gate, fed in log order. Mirror of RunCounter.replaying() + finish()."""
+    """Engine + step gate, fed in log order. Mirror of RunCounter.replaying() + finish().
+
+    If `segments` is given, every counted (start, end, metres) is appended to it.
+    """
     header = next((ln for ln in lines if ln.get("type") == "header"), {})
     start = float(header.get("t", lines[0]["t"] if lines else 0))
     e = Engine(settings or settings_from_dict(header.get("settings") or {}))
@@ -351,6 +358,8 @@ def replay_gated(
         if e.last_segment:
             seg_start, seg_end, meters = e.last_segment
             g.add_distance(meters, seg_start, seg_end)
+            if segments is not None:
+                segments.append(e.last_segment)
 
     for ln in lines:
         kind = ln.get("type")
@@ -606,6 +615,28 @@ def _read_summary_notes(log_path: str) -> dict:
         return {}
 
 
+def treadmill_report(log: RunLog) -> int:
+    from treadmill import StrideModel, replay_treadmill  # treadmill.py imports this module
+
+    c = replay_treadmill(log.lines)
+    model = StrideModel.from_dict(log.header.get("stride"))
+    print("Treadmill run")
+    if model:
+        print(
+            f"  Stride model         {model.step_length(2.7):.2f} m a step at 162 steps/min ({model.samples} windows)"
+        )
+    else:
+        print("  Stride model         none (the iPhone's pedometer distance was used)")
+    print(f"  {'Counted':<20} {c.counted / 1000:7.3f} km   ({c.steps} steps)")
+    print(f"  {'Not counted':<20} {c.rejected / 1000:7.3f} km   (car, bike or standing still)")
+    stop = next((ln for ln in log.lines if ln.get("type") == "event" and ln.get("name") == "stop"), None)
+    if stop is not None and stop.get("counted") is not None:
+        diff = abs(stop["counted"] - c.counted)
+        status = "matches this replay" if diff < 0.5 else f"DIFFERS from this replay by {diff:.1f} m"
+        print(f"  Phone's own counted total: {stop['counted'] / 1000:.3f} km ({status})")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("log", help="raw.jsonl exported from the app")
@@ -628,6 +659,8 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     log = read_log(args.log)
+    if log.header.get("mode") == "treadmill":
+        return treadmill_report(log)
     if not log.fixes:
         print("No fixes in this log.", file=sys.stderr)
         return 1

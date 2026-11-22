@@ -43,6 +43,7 @@ public struct LogLine: Codable, Equatable, Sendable {
     public var counted: Double?
     public var noSteps: Double?
     public var vehicle: Double?
+    public var rejected: Double?       // treadmill: car, bike or standing still
 
     // Header and event fields
     public var name: String?
@@ -52,6 +53,9 @@ public struct LogLine: Codable, Equatable, Sendable {
     public var app: String?
     public var settings: EngineSettings?
     public var gate: StepGateSettings?
+    public var mode: RunMode?          // nil means outdoor
+    public var stride: StrideModel?    // treadmill header: the model used; outdoor stop: the model learned
+    public var treadmill: TreadmillSettings?
     public var targetKm: Double?
 
     public init(type: String, t: Double) {
@@ -88,6 +92,8 @@ public struct RunSummary: Codable, Equatable, Identifiable, Sendable {
     public var countedTargetAt: Date?
     public var steps: Int?
     public var pedometerMeters: Double?
+    public var mode: RunMode?            // nil means outdoor
+    public var rejectedMeters: Double?   // treadmill: car, bike or standing still
 
     public init(id: String, startedAt: Date, endedAt: Date, targetKm: Double,
                 cleanMeters: Double, speedMeters: Double, rawMeters: Double,
@@ -96,7 +102,8 @@ public struct RunSummary: Codable, Equatable, Identifiable, Sendable {
                 device: String, os: String, appVersion: String, settings: EngineSettings,
                 stravaKm: Double? = nil, trueKm: Double? = nil, note: String? = nil,
                 countedMeters: Double? = nil, noStepsMeters: Double? = nil, vehicleMeters: Double? = nil,
-                countedTargetAt: Date? = nil, steps: Int? = nil, pedometerMeters: Double? = nil) {
+                countedTargetAt: Date? = nil, steps: Int? = nil, pedometerMeters: Double? = nil,
+                mode: RunMode? = nil, rejectedMeters: Double? = nil) {
         self.id = id
         self.startedAt = startedAt
         self.endedAt = endedAt
@@ -123,6 +130,8 @@ public struct RunSummary: Codable, Equatable, Identifiable, Sendable {
         self.countedTargetAt = countedTargetAt
         self.steps = steps
         self.pedometerMeters = pedometerMeters
+        self.mode = mode
+        self.rejectedMeters = rejectedMeters
     }
 }
 
