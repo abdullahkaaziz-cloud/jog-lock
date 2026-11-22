@@ -1,0 +1,125 @@
+# Jog Tracker: Jog Lock distance test build (approach 1)
+
+This test app measures jog distance with Core Location's fitness updates, then cleans up the GPS points the way Strava does. It shows three distances side by side so you can see which one matches reality:
+
+| Number | How it's worked out |
+|---|---|
+| **Jog Lock (cleaned)** | The main number. It waits for a good GPS signal, drops weak or jumpy points, ignores time standing still, then adds up moves of 5 m or more. |
+| **Speed-based** | Adds up the iPhone's GPS speed reading × time. It isn't fooled by position wobble, but it's only as good as the iPhone's speed reading. |
+| **Raw, no clean-up** | Joins up every point. This is what a naive app shows, and it usually comes out too long. |
+
+The app saves every GPS point to a log, so a run can be replayed later with different settings without running again.
+
+There's no app blocking in this build, only the distance tracking.
+
+## Put it on your iPhone
+
+You need Xcode 16 or later (Xcode 26 is fine) and an iPhone on iOS 17 or later.
+
+1. Open `JogLockTracker.xcodeproj`.
+2. Click the **JogLockTracker** target, then open **Signing & Capabilities**.
+   - Pick your **Team**.
+   - Change the **Bundle Identifier** from `com.yourname.joglock.tracker` to your own prefix.
+3. Plug in your iPhone, select it as the run destination and press **Run** (⌘R). If iOS asks, turn on Developer Mode on the phone.
+4. Tap **Start run**, then allow:
+   - **While Using the App**, with **Precise Location** on
+   - notifications
+
+Background location and the permission texts are already set up in `Config/Info.plist`.
+
+## Test jog protocol
+
+**Where to run:** a 400 m athletics track is best, because 2.5 laps of lane 1 is exactly 1 km. If you can't get to one, use any route you can measure on a map afterwards (for example gpx.studio, or Google Maps' "Measure distance").
+
+1. At the start line, set the target to 1.00 km and tap **Start run**. Wait for **"GPS ready"** (the phone buzzes and shows a banner).
+2. Open Strava and start a run recording on the same phone.
+3. Lock the phone, carry it the way you normally would, and go.
+4. When **"1.00 km reached"** pops up, note where you are, for example "about 10 m before the 2.5-lap line".
+5. Optional: stand still for about a minute halfway round. This tests whether distance builds up while you aren't moving.
+6. Finish at a known point, and stop Strava and Jog Tracker there.
+7. In Jog Tracker, open **Last run**:
+   - Type in Strava's distance and the true distance, then tap **Save**.
+   - Tap **Share run files** and AirDrop them to your Mac, or save them to Files.
+
+Send me `raw.jsonl` and `summary.json`, and I'll analyse the run.
+
+The run files are also in the Files app, under **On My iPhone > Jog Tracker > Runs**.
+
+## Analyse a run on your Mac
+
+```
+python3 Tools/replay.py path/to/raw.jsonl --true-km 1.0 --strava-km 1.02 --sweep --gpx compare.gpx
+```
+
+The script:
+
+- **Recomputes all three distances.** The engine in `replay.py` mirrors `DistanceEngine.swift` line for line, so it prints a check that it matches the phone's own total.
+- **Lists why points were dropped,** with GPS accuracy stats and any gaps.
+- **Runs "Experiments"** with two smoothing variants that aren't in the app yet.
+- **Shows the effect of each setting** (`--sweep`), so tuning is based on real data.
+- **Writes a GPX file** (`--gpx`) with every point plus the points that were counted. Open it next to Strava's GPX export in gpx.studio to compare the tracks.
+
+Two other useful commands:
+
+- `--set minStepFloor=3` (repeatable) tries a different setting.
+- `python3 Tools/test_engine.py` runs the checks on simulated runs: track, slow jog, street corners, stops, GPS jumps, a noisy city route, driving, and standing still.
+
+## Settings
+
+The settings are `EngineSettings` in `DistanceEngine.swift`, mirrored by `Settings` in `Tools/replay.py`. If you change a rule, change both files.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| warmupAccuracy / warmupFixes | 15 m / 3 | Counting starts after 3 fixes in a row that are accurate to ±15 m. |
+| maxAccuracy | 25 m | Weaker fixes are ignored while tracking. |
+| maxSpeed | 9 m/s | Any faster movement is treated as a GPS jump, so driving never counts. |
+| stopSpeed | 0.5 m/s | Below this you're standing still, so no distance is added. |
+| minStepFloor | 5 m | Smallest move that gets counted. Higher values cut wobble but cut corners. |
+| maxGap | 120 s | Signal gaps longer than this aren't joined with a straight line. |
+| speedMaxAccuracy | 3 m/s | The speed-based number ignores speed readings less accurate than this. |
+
+## What simulation says, and what it can't
+
+Simulated GPS noise suggests:
+
+| Distance | Typical result on a 1 km run |
+|---|---|
+| Cleaned | Usually 0.5–2% too long, worst single run about 4% |
+| Speed-based | Within about ±0.5% |
+| Raw | About 8% too long |
+
+Standing still with iOS's stationary signal adds nothing, and driving adds nothing.
+
+These numbers come from a made-up noise model, so your jog decides which method wins.
+
+## Known limits of approach 1
+
+- **Cycling:** it can't tell jogging from cycling at jogging speeds. Driving is ignored. Checking steps and motion would fix this, which is the next step.
+- **Indoors:** treadmills and indoor runs get no GPS, so no distance.
+- **Force-quit:** swiping the app away stops tracking. If iOS ends the app itself, it relaunches and resumes the run on its own (the blue location pill stays on).
+
+## If Xcode won't open the project
+
+1. Make a new **iOS App** project (SwiftUI) called `JogLockTracker`.
+2. Replace its Swift files with the ones in `JogLockTracker/`.
+3. Copy the keys from `Config/Info.plist` into the target's **Info** tab.
+4. In **Signing & Capabilities**, add **Background Modes** and tick **Location updates**.
+5. Set **iOS Deployment Target** to 17.0.
+
+## Files
+
+```
+JogLockTracker.xcodeproj    Xcode project (Xcode 16+)
+Config/Info.plist           permissions, background location, Files app access
+JogLockTracker/
+  DistanceEngine.swift      clean-up rules + the three distance estimates
+  RunTracker.swift          location stream, background session, logging, alerts, resume
+  RunStore.swift            run files (raw.jsonl, summary.json, GPX export)
+  ContentView.swift         live screen
+  RunListView.swift         past runs, notes, sharing
+  JogLockTrackerApp.swift   app entry, notification banners
+Tools/
+  replay.py                 re-run a log with any settings, compare, export GPX
+  simulate.py               make synthetic runs
+  test_engine.py            checks on simulated runs
+```
