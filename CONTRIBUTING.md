@@ -17,6 +17,7 @@ This is how changes are made in this repo. It follows the
 
 | What | Command |
 |---|---|
+| Swift unit tests | `cd Packages/JogLockCore && swift test` |
 | Python mirror tests | `python3 Tools/test_engine.py` |
 | Python lint and format | `ruff check Tools && ruff format --check Tools` |
 | App build | Build the `JogLockTracker` scheme in Xcode, or let CI do it |
@@ -29,7 +30,8 @@ A change is done when its own acceptance criteria are met **and** all of this ho
 
 **Correctness**
 - New behaviour is covered by tests that fail without the change. A bug fix starts with a test that shows the bug.
-- Existing tests pass, including the real-run fixture in `Tools/fixtures/`.
+- Existing tests pass, including the real-run fixture in `Tools/fixtures/`, which both test suites replay.
+- Logic that doesn't need an iPhone lives in `Packages/JogLockCore`, so it can be tested with `swift test`. The app keeps only the iPhone parts (location, motion, screens).
 - A change to a distance rule is made in the Swift engine **and** in the Python mirror (`Tools/replay.py`). Both test suites check the same expected numbers.
 - Anything that touches tracking is checked on a phone before a release (a jog, a walk, or a treadmill run as relevant).
 
