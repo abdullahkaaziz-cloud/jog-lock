@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Checks for the distance engine using simulated runs.
 
-  python3 test_engine.py
+python3 test_engine.py
 """
+
 from __future__ import annotations
 
 import json
@@ -25,8 +26,11 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 
 
 def to_fixes(lines):
-    return [Fix(l["t"], l["lat"], l["lon"], l["hAcc"], l["speed"], l["speedAcc"], l["stationary"])
-            for l in lines if l["type"] == "fix"]
+    return [
+        Fix(ln["t"], ln["lat"], ln["lon"], ln["hAcc"], ln["speed"], ln["speedAcc"], ln["stationary"])
+        for ln in lines
+        if ln["type"] == "fix"
+    ]
 
 
 def run(kind, seed=1, settings=None):
@@ -68,12 +72,21 @@ def test_track_accuracy():
         speed_errs.append((e.speed_dist - true_m) / true_m * 100)
     mean = sum(errs) / len(errs)
     worst = max(errs, key=abs)
-    check("clean on a 1 km track run: mean within ±2.5%, every run within ±5% (20 seeds)",
-          abs(mean) < 2.5 and all(abs(x) < 5 for x in errs), f"mean {mean:+.2f}%, worst {worst:+.2f}%")
-    check("speed-based within ±2% on the track", all(abs(x) < 2 for x in speed_errs),
-          f"mean {sum(speed_errs) / len(speed_errs):+.2f}%")
-    check("raw over-counts more than clean", sum(raw_errs) / len(raw_errs) > mean,
-          f"raw mean {sum(raw_errs) / len(raw_errs):+.2f}%")
+    check(
+        "clean on a 1 km track run: mean within ±2.5%, every run within ±5% (20 seeds)",
+        abs(mean) < 2.5 and all(abs(x) < 5 for x in errs),
+        f"mean {mean:+.2f}%, worst {worst:+.2f}%",
+    )
+    check(
+        "speed-based within ±2% on the track",
+        all(abs(x) < 2 for x in speed_errs),
+        f"mean {sum(speed_errs) / len(speed_errs):+.2f}%",
+    )
+    check(
+        "raw over-counts more than clean",
+        sum(raw_errs) / len(raw_errs) > mean,
+        f"raw mean {sum(raw_errs) / len(raw_errs):+.2f}%",
+    )
 
 
 def test_slow_jog():
@@ -81,8 +94,11 @@ def test_slow_jog():
     for seed in range(1, 11):
         e, _, true_m = run("slow", seed)
         errs.append((e.clean - true_m) / true_m * 100)
-    check("slow jog (2.2 m/s) within ±4%", all(abs(x) < 4 for x in errs),
-          f"mean {sum(errs) / len(errs):+.2f}%, worst {max(errs, key=abs):+.2f}%")
+    check(
+        "slow jog (2.2 m/s) within ±4%",
+        all(abs(x) < 4 for x in errs),
+        f"mean {sum(errs) / len(errs):+.2f}%, worst {max(errs, key=abs):+.2f}%",
+    )
 
 
 def test_streets():
@@ -92,9 +108,11 @@ def test_streets():
         errs.append((e.clean - true_m) / true_m * 100)
         spd.append((e.speed_dist - true_m) / true_m * 100)
     mean = sum(errs) / len(errs)
-    check("street grid (90° turn every 120 m): mean within ±2.5%, every run within ±5%",
-          abs(mean) < 2.5 and all(abs(x) < 5 for x in errs),
-          f"clean mean {mean:+.2f}%, worst {max(errs, key=abs):+.2f}%, speed mean {sum(spd) / len(spd):+.2f}%")
+    check(
+        "street grid (90° turn every 120 m): mean within ±2.5%, every run within ±5%",
+        abs(mean) < 2.5 and all(abs(x) < 5 for x in errs),
+        f"clean mean {mean:+.2f}%, worst {max(errs, key=abs):+.2f}%, speed mean {sum(spd) / len(spd):+.2f}%",
+    )
 
 
 def test_stop_adds_little():
@@ -123,9 +141,11 @@ def test_stop_with_update_pause():
         errs.append((e.clean - true_m) / true_m * 100)
         lost_resume += dec.count("drift")
     mean = sum(errs) / len(errs)
-    check("stop with paused updates: resume movement still counted",
-          abs(mean) < 2.5 and all(abs(x) < 5 for x in errs) and lost_resume == 0,
-          f"mean {sum(errs) / len(errs):+.2f}%, drift decisions {lost_resume}")
+    check(
+        "stop with paused updates: resume movement still counted",
+        abs(mean) < 2.5 and all(abs(x) < 5 for x in errs) and lost_resume == 0,
+        f"mean {sum(errs) / len(errs):+.2f}%, drift decisions {lost_resume}",
+    )
 
 
 def test_standstill():
@@ -156,19 +176,21 @@ def test_urban():
         errs.append((e.clean - true_m) / true_m * 100)
         raw_errs.append((e.raw - true_m) / true_m * 100)
     mean, raw_mean = sum(errs) / len(errs), sum(raw_errs) / len(raw_errs)
-    check("urban (very noisy, 25 s dropout): mean within ±10% and far better than raw",
-          abs(mean) < 10 and raw_mean > 2 * mean,
-          f"clean mean {mean:+.2f}%, worst {max(errs, key=abs):+.2f}%, raw mean {raw_mean:+.2f}%")
+    check(
+        "urban (very noisy, 25 s dropout): mean within ±10% and far better than raw",
+        abs(mean) < 10 and raw_mean > 2 * mean,
+        f"clean mean {mean:+.2f}%, worst {max(errs, key=abs):+.2f}%, raw mean {raw_mean:+.2f}%",
+    )
 
 
 def test_drive_counts_nothing():
-    e, dec, _ = run("drive", 1)
+    e, _dec, _ = run("drive", 1)
     check("driving at 14 m/s counts ~0 m", e.clean < 30, f"clean {e.clean:.1f} m, raw {e.raw:.0f} m")
     check("speed-based ignores driving", e.speed_dist < 30, f"{e.speed_dist:.1f} m")
 
 
 def test_warmup_gate():
-    e, dec, _ = run("track", 5)
+    _e, dec, _ = run("track", 5)
     first = dec.index("warmupComplete")
     check("warm-up waits for good fixes", first >= 5, f"tracking began at fix {first}")
 
@@ -219,8 +241,16 @@ def test_replay_parity_roundtrip():
             ln = dict(ln, decision=dec, clean=e.clean, speedDist=e.speed_dist, raw=e.raw)
         out.append(ln)
     e.finalize()
-    out.append({"type": "event", "t": out[-1]["t"] + 1, "name": "stop",
-                "clean": e.clean, "speedDist": e.speed_dist, "raw": e.raw})
+    out.append(
+        {
+            "type": "event",
+            "t": out[-1]["t"] + 1,
+            "name": "stop",
+            "clean": e.clean,
+            "speedDist": e.speed_dist,
+            "raw": e.raw,
+        }
+    )
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "raw.jsonl")
         with open(p, "w") as fh:
@@ -231,12 +261,48 @@ def test_replay_parity_roundtrip():
     check("replay reproduces logged totals", abs(e2.clean - e.clean) < 1e-6, f"{e2.clean:.3f} vs {e.clean:.3f}")
 
 
+FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+
+
+def test_run1_fixture():
+    """Real run, 22 Nov 2026 (anonymised): Strava 3.00 km, phone said 3.012 km.
+
+    Guards against any change to the engine silently moving the numbers on
+    real data. If a deliberate rule change moves them, update the expected
+    values here and say why in the commit message.
+    """
+    log = read_log(os.path.join(FIXTURES, "run1-anon.jsonl"))
+    e, _ = run_engine(log.fixes, Settings())
+    stop = next(ln for ln in log.lines if ln.get("type") == "event" and ln.get("name") == "stop")
+    check(
+        "run 1: replay matches the phone's live total",
+        abs(e.clean - stop["clean"]) < 0.5,
+        f"replay {e.clean:.2f} m, phone {stop['clean']:.2f} m",
+    )
+    check("run 1: cleaned distance is 3012.2 m (Strava 3000 m)", abs(e.clean - 3012.22) < 0.5, f"{e.clean:.2f} m")
+    check("run 1: speed-based distance is 2863.4 m", abs(e.speed_dist - 2863.39) < 0.5, f"{e.speed_dist:.2f} m")
+    check("run 1: raw distance is 3048.5 m", abs(e.raw - 3048.47) < 0.5, f"{e.raw:.2f} m")
+
+
 if __name__ == "__main__":
-    for fn in [test_geometry, test_track_accuracy, test_slow_jog, test_streets, test_stop_adds_little,
-               test_stop_with_update_pause, test_standstill,
-               test_outliers, test_urban, test_drive_counts_nothing, test_warmup_gate,
-               test_out_of_order_and_duplicates, test_gap_not_bridged, test_finalize_tail,
-               test_replay_parity_roundtrip]:
+    for fn in [
+        test_geometry,
+        test_track_accuracy,
+        test_slow_jog,
+        test_streets,
+        test_stop_adds_little,
+        test_stop_with_update_pause,
+        test_standstill,
+        test_outliers,
+        test_urban,
+        test_drive_counts_nothing,
+        test_warmup_gate,
+        test_out_of_order_and_duplicates,
+        test_gap_not_bridged,
+        test_finalize_tail,
+        test_replay_parity_roundtrip,
+        test_run1_fixture,
+    ]:
         fn()
     print()
     print("All checks passed." if FAILED == 0 else f"{FAILED} check(s) failed.")

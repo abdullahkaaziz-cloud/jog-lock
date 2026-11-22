@@ -106,10 +106,14 @@ These numbers come from a made-up noise model, so your jog decides which method 
 4. In **Signing & Capabilities**, add **Background Modes** and tick **Location updates**.
 5. Set **iOS Deployment Target** to 17.0.
 
+## Development
+
+Changes go through branches and pull requests, with CI on each one. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and the Definition of Done, [CHANGELOG.md](CHANGELOG.md) for what changed, and [docs/adr](docs/adr) for the main design decisions.
+
 ## Files
 
 ```
-JogLockTracker.xcodeproj    Xcode project (Xcode 16+)
+JogLockTracker.xcodeproj    Xcode project (Xcode 16+), with a shared scheme
 Config/Info.plist           permissions, background location, Files app access
 JogLockTracker/
   DistanceEngine.swift      clean-up rules + the three distance estimates
@@ -121,5 +125,9 @@ JogLockTracker/
 Tools/
   replay.py                 re-run a log with any settings, compare, export GPX
   simulate.py               make synthetic runs
-  test_engine.py            checks on simulated runs
+  test_engine.py            checks on simulated runs and the real-run fixture
+  anonymize_log.py          make a run log safe to commit
+  fixtures/                 anonymised real runs used as regression tests
+docs/adr/                   architecture decision records
+.github/                    CI workflow, pull request template, Dependabot
 ```
