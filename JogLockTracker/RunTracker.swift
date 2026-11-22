@@ -10,8 +10,9 @@
 //  next location update; the run resumes by replaying its own log.
 //
 
-import Foundation
 import CoreLocation
+import Foundation
+import JogLockCore
 import UIKit
 import UserNotifications
 
@@ -98,7 +99,7 @@ final class RunTracker: NSObject, ObservableObject {
         writer = nil
 
         let summary = makeSummary(id: id, endedAt: Date())
-        RunStore.save(summary)
+        try? RunStore.onDevice.save(summary)
         lastFinishedRun = summary
 
         clearActiveRun()
@@ -130,8 +131,8 @@ final class RunTracker: NSObject, ObservableObject {
 
         let id = RunStore.newRunID()
         do {
-            try RunStore.createDirectory(for: id)
-            writer = try RunLogWriter(url: RunStore.rawLogURL(for: id))
+            try RunStore.onDevice.createDirectory(for: id)
+            writer = try RunLogWriter(url: RunStore.onDevice.rawLogURL(for: id))
         } catch {
             status = .idle
             warning = "Couldn't create the run log: \(error.localizedDescription)"
@@ -296,7 +297,7 @@ final class RunTracker: NSObject, ObservableObject {
         let start = defaults.double(forKey: Keys.activeRunStart)
         let target = defaults.double(forKey: Keys.activeRunTarget)
 
-        let lines = RunStore.readLines(id: id)
+        let lines = RunStore.onDevice.readLines(id: id)
         let settings = lines.first(where: { $0.type == "header" })?.settings ?? .standard
         runTargetKm = target > 0 ? target : targetKm
         startedAt = Date(timeIntervalSince1970: start)
@@ -316,7 +317,7 @@ final class RunTracker: NSObject, ObservableObject {
         speedTargetReached = speedTargetAt != nil
         snapshot = engine.snapshot
         runID = id
-        writer = try? RunLogWriter(url: RunStore.rawLogURL(for: id))
+        writer = try? RunLogWriter(url: RunStore.onDevice.rawLogURL(for: id))
 
         if Date().timeIntervalSince1970 - start > 6 * 3600 {
             // Left over from hours ago: save it rather than carrying on.
@@ -466,16 +467,5 @@ extension GPSFix {
                   speed: location.speed,
                   speedAcc: location.speedAccuracy,
                   stationary: stationary)
-    }
-
-    init?(line: LogLine) {
-        guard line.type == "fix", let lat = line.lat, let lon = line.lon else { return nil }
-        self.init(t: line.t,
-                  lat: lat,
-                  lon: lon,
-                  hAcc: line.hAcc ?? -1,
-                  speed: line.speed ?? -1,
-                  speedAcc: line.speedAcc ?? -1,
-                  stationary: line.stationary ?? false)
     }
 }

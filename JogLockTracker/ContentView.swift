@@ -3,6 +3,7 @@
 //  JogLockTracker
 //
 
+import JogLockCore
 import SwiftUI
 
 struct ContentView: View {

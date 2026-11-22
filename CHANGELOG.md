@@ -11,6 +11,11 @@ All notable changes to this project are listed here. The format follows [Keep a 
 - `Tools/anonymize_log.py`, to make a run log safe to commit.
 - Contribution guide with the Definition of Done, a pull request template, and ADR-0001.
 - A shared Xcode scheme, so the app builds the same way on any Mac.
+- Swift unit tests for the distance engine, run files and the real-run fixture, run on Linux in CI.
+
+### Changed
+
+- The distance engine, run log formats and run files moved into a local Swift package, `JogLockCore`. The app links it. No change in behaviour.
 
 ## [0.1.0] - 2026-11-22
 

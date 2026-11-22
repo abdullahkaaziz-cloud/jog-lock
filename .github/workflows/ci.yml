@@ -34,6 +34,19 @@ jobs:
       - name: Engine mirror tests
         run: python Tools/test_engine.py
 
+  core:
+    name: Core package tests (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.2
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Swift version
+        run: swift --version
+      - name: Test
+        working-directory: Packages/JogLockCore
+        run: swift test
+
   ios-build:
     name: iOS app build (unsigned)
     runs-on: macos-latest

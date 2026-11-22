@@ -101,7 +101,7 @@ These numbers come from a made-up noise model, so your jog decides which method 
 ## If Xcode won't open the project
 
 1. Make a new **iOS App** project (SwiftUI) called `JogLockTracker`.
-2. Replace its Swift files with the ones in `JogLockTracker/`.
+2. Replace its Swift files with the ones in `JogLockTracker/`, then add `Packages/JogLockCore` with **File > Add Package Dependencies… > Add Local…**.
 3. Copy the keys from `Config/Info.plist` into the target's **Info** tab.
 4. In **Signing & Capabilities**, add **Background Modes** and tick **Location updates**.
 5. Set **iOS Deployment Target** to 17.0.
@@ -115,10 +115,13 @@ Changes go through branches and pull requests, with CI on each one. See [CONTRIB
 ```
 JogLockTracker.xcodeproj    Xcode project (Xcode 16+), with a shared scheme
 Config/Info.plist           permissions, background location, Files app access
-JogLockTracker/
+Packages/JogLockCore/       logic that doesn't need an iPhone, tested with `swift test`
   DistanceEngine.swift      clean-up rules + the three distance estimates
-  RunTracker.swift          location stream, background session, logging, alerts, resume
+  RunLog.swift              log line and run summary formats
   RunStore.swift            run files (raw.jsonl, summary.json, GPX export)
+JogLockTracker/             the iPhone app
+  RunTracker.swift          location stream, background session, logging, alerts, resume
+  RunStore+Device.swift     where runs are saved on the phone
   ContentView.swift         live screen
   RunListView.swift         past runs, notes, sharing
   JogLockTrackerApp.swift   app entry, notification banners

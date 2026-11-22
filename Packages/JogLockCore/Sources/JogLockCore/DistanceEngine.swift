@@ -1,6 +1,6 @@
 //
 //  DistanceEngine.swift
-//  JogLockTracker
+//  JogLockCore
 //
 //  Turns a stream of GPS fixes into a distance, Strava-style: wait for a good
 //  signal, drop bad points and jumps, ignore standing still, then add up what
@@ -13,36 +13,49 @@
 import Foundation
 
 /// One location fix, reduced to what the engine needs.
-struct GPSFix: Equatable {
-    var t: TimeInterval     // seconds since 1970
-    var lat: Double
-    var lon: Double
-    var hAcc: Double        // metres; negative means invalid
-    var speed: Double       // m/s; negative means invalid
-    var speedAcc: Double    // m/s; negative means invalid
-    var stationary: Bool    // iOS says the device is not moving
+public struct GPSFix: Equatable, Sendable {
+    public var t: TimeInterval     // seconds since 1970
+    public var lat: Double
+    public var lon: Double
+    public var hAcc: Double        // metres; negative means invalid
+    public var speed: Double       // m/s; negative means invalid
+    public var speedAcc: Double    // m/s; negative means invalid
+    public var stationary: Bool    // iOS says the device is not moving
+
+    public init(t: TimeInterval, lat: Double, lon: Double, hAcc: Double,
+                speed: Double, speedAcc: Double, stationary: Bool) {
+        self.t = t
+        self.lat = lat
+        self.lon = lon
+        self.hAcc = hAcc
+        self.speed = speed
+        self.speedAcc = speedAcc
+        self.stationary = stationary
+    }
 }
 
 /// Tuning knobs. Defaults are a starting point; tune them with logged runs.
-struct EngineSettings: Codable, Equatable {
-    var warmupAccuracy: Double = 15         // m: a fix this good counts toward warm-up
-    var warmupFixes: Int = 3                // consecutive good fixes before counting starts
-    var maxAccuracy: Double = 25            // m: worse fixes are ignored while tracking
-    var maxSpeed: Double = 9                // m/s: faster implied movement is a GPS jump
-    var stopSpeed: Double = 0.5             // m/s: slower means standing still
-    var minStepFloor: Double = 5            // m: minimum move before a segment counts
-    var minStepAccuracyFactor: Double = 0.5 // min step is also at least this x accuracy
-    var maxGap: Double = 120                // s: longer gaps while moving are not bridged
-    var jumpResetCount: Int = 3             // consecutive jumps before re-anchoring
-    var speedMaxAccuracy: Double = 3        // m/s: worse speed readings are ignored
-    var speedMaxDt: Double = 10             // s: longer intervals use straight-line distance
-    var resumeGap: Double = 5               // s: an update pause this long while stationary = iOS paused
+public struct EngineSettings: Codable, Equatable, Sendable {
+    public var warmupAccuracy: Double = 15         // m: a fix this good counts toward warm-up
+    public var warmupFixes: Int = 3                // consecutive good fixes before counting starts
+    public var maxAccuracy: Double = 25            // m: worse fixes are ignored while tracking
+    public var maxSpeed: Double = 9                // m/s: faster implied movement is a GPS jump
+    public var stopSpeed: Double = 0.5             // m/s: slower means standing still
+    public var minStepFloor: Double = 5            // m: minimum move before a segment counts
+    public var minStepAccuracyFactor: Double = 0.5 // min step is also at least this x accuracy
+    public var maxGap: Double = 120                // s: longer gaps while moving are not bridged
+    public var jumpResetCount: Int = 3             // consecutive jumps before re-anchoring
+    public var speedMaxAccuracy: Double = 3        // m/s: worse speed readings are ignored
+    public var speedMaxDt: Double = 10             // s: longer intervals use straight-line distance
+    public var resumeGap: Double = 5               // s: an update pause this long while stationary = iOS paused
 
-    static let standard = EngineSettings()
+    public static let standard = EngineSettings()
+
+    public init() {}
 }
 
 /// What the engine did with a fix. Raw values are written to the log.
-enum FixDecision: String, Codable {
+public enum FixDecision: String, Codable, Sendable {
     case warmingUp
     case warmupComplete
     case accepted
@@ -57,25 +70,27 @@ enum FixDecision: String, Codable {
     case gapReset
 }
 
-enum EnginePhase: String, Codable {
+public enum EnginePhase: String, Codable, Sendable {
     case warmingUp
     case tracking
 }
 
 /// Everything the UI and the summary need.
-struct EngineSnapshot: Equatable {
-    var phase: EnginePhase = .warmingUp
-    var cleanMeters: Double = 0     // main number: Strava-style cleaned distance
-    var speedMeters: Double = 0     // comparison: sum of GPS speed x time
-    var rawMeters: Double = 0       // comparison: every fix joined up, no clean-up
-    var movingSeconds: Double = 0
-    var fixCount: Int = 0
-    var acceptedCount: Int = 0
-    var rejected: [String: Int] = [:]
-    var isPaused: Bool = false
+public struct EngineSnapshot: Equatable, Sendable {
+    public var phase: EnginePhase = .warmingUp
+    public var cleanMeters: Double = 0     // main number: Strava-style cleaned distance
+    public var speedMeters: Double = 0     // comparison: sum of GPS speed x time
+    public var rawMeters: Double = 0       // comparison: every fix joined up, no clean-up
+    public var movingSeconds: Double = 0
+    public var fixCount: Int = 0
+    public var acceptedCount: Int = 0
+    public var rejected: [String: Int] = [:]
+    public var isPaused: Bool = false
+
+    public init() {}
 }
 
-enum Geo {
+public enum Geo {
     private static let a = 6_378_137.0
     private static let flattening = 1.0 / 298.257223563
     private static let e2 = flattening * (2.0 - flattening)
@@ -84,7 +99,7 @@ enum Geo {
     /// Distance in metres between two nearby points, using the WGS84
     /// radii at the mid latitude (more accurate than a spherical haversine
     /// for the short hops between fixes).
-    static func distance(lat1: Double, lon1: Double, lat2: Double, lon2: Double) -> Double {
+    public static func distance(lat1: Double, lon1: Double, lat2: Double, lon2: Double) -> Double {
         let phi = ((lat1 + lat2) / 2) * degToRad
         let s = sin(phi)
         let w = (1 - e2 * s * s).squareRoot()
@@ -102,14 +117,14 @@ enum Geo {
         return (dx * dx + dy * dy).squareRoot()
     }
 
-    static func distance(_ p: GPSFix, _ q: GPSFix) -> Double {
+    public static func distance(_ p: GPSFix, _ q: GPSFix) -> Double {
         distance(lat1: p.lat, lon1: p.lon, lat2: q.lat, lon2: q.lon)
     }
 }
 
-struct DistanceEngine {
-    let settings: EngineSettings
-    private(set) var snapshot = EngineSnapshot()
+public struct DistanceEngine: Sendable {
+    public let settings: EngineSettings
+    public private(set) var snapshot = EngineSnapshot()
 
     private var goodStreak = 0
     private var anchor: GPSFix?
@@ -120,12 +135,12 @@ struct DistanceEngine {
     private var jumpStreak = 0
     private var motionStart: TimeInterval = -Double.infinity
 
-    init(settings: EngineSettings = .standard) {
+    public init(settings: EngineSettings = .standard) {
         self.settings = settings
     }
 
     @discardableResult
-    mutating func process(_ f: GPSFix) -> FixDecision {
+    public mutating func process(_ f: GPSFix) -> FixDecision {
         let s = settings
         snapshot.fixCount += 1
 
@@ -235,7 +250,7 @@ struct DistanceEngine {
 
     /// Counts the last partial segment when the run ends.
     @discardableResult
-    mutating func finalize() -> EngineSnapshot {
+    public mutating func finalize() -> EngineSnapshot {
         let s = settings
         guard snapshot.phase == .tracking, !snapshot.isPaused,
               let a = anchor, let g = lastGood, g.t > a.t else {

@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		E9CBCC3297C3A8A5B5C32909 /* JogLockCore in Frameworks */ = {isa = PBXBuildFile; productRef = D33F38D407AD76F845B47593 /* JogLockCore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		5EF0BB15741B7A1E3DAFF81E /* JogLockTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JogLockTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		70EF3EFE10E51FAE362EE6E5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -24,6 +28,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E9CBCC3297C3A8A5B5C32909 /* JogLockCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,6 +80,7 @@
 			);
 			name = JogLockTracker;
 			packageProductDependencies = (
+				D33F38D407AD76F845B47593 /* JogLockCore */,
 			);
 			productName = JogLockTracker;
 			productReference = 5EF0BB15741B7A1E3DAFF81E /* JogLockTracker.app */;
@@ -104,6 +110,9 @@
 			);
 			mainGroup = C259F3FF958E8D97679D1FEC;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				221E713ACEC297F69C09E87B /* XCLocalSwiftPackageReference "Packages/JogLockCore" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2F73E0D4E82691EB65300FA0 /* Products */;
 			projectDirPath = "";
@@ -284,6 +293,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		221E713ACEC297F69C09E87B /* XCLocalSwiftPackageReference "Packages/JogLockCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/JogLockCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D33F38D407AD76F845B47593 /* JogLockCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = JogLockCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A05B64375D8F49F0E0C03B4E /* Project object */;
 }
