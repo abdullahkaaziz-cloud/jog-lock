@@ -39,6 +39,8 @@ Tap **Choose apps to lock** on the home screen. iOS asks for Screen Time access 
 - **No easy way out.** While the apps are locked you can add apps but not remove them. The lock can only be turned off (the ⋯ menu on the card) after the day's run.
   - **Settings → App lock** shows how to stop yourself switching off Screen Time access: someone you trust keeps a Screen Time passcode.
 - **Changing the target** while the lock is on takes effect tomorrow, so you can't lower it to unlock today.
+- **Websites typed in by name.** For websites the picker doesn't list: ⋯ → **Websites**, then type `instagram.com` (or paste a whole address). They're blocked in Safari and other browsers, subdomains too, with iOS's own "Restricted" page. Up to 40 websites in all, chosen and typed; while locked they can only be added.
+- **Time on apps.** Once Screen Time is connected, a card at the bottom of the home screen shows a day on average this week against last week, what this week's time would take to run for (15 minutes a km), and the five apps used most. With the lock on it covers the locked apps; otherwise every app. A separate extension draws it, and iOS keeps the numbers inside that extension: Jog Lock never sees them.
 - **Diagnostics.** If something looks wrong, Settings → App lock → **Share lock diagnostics**. It shows what the lock did and when, never which apps you chose.
 
 It needs a paid Apple Developer team, because free Personal Teams can't use Family Controls. See [Put it on your iPhone](#put-it-on-your-iphone).
@@ -68,10 +70,10 @@ You need Xcode 16 or later (Xcode 26 is fine) and an iPhone on iOS 18 or later.
 
 1. Open `JogLockTracker.xcodeproj`.
 2. Signing is automatic, with the team already set in the project.
-   - **Another team?** Pick it in **Signing & Capabilities** for each of the five targets: JogLockTracker, JogLockWidgets, JogLockMonitor, JogLockShield and JogLockShieldAction.
+   - **Another team?** Pick it in **Signing & Capabilities** for each of the six targets: JogLockTracker, JogLockWidgets, JogLockMonitor, JogLockShield, JogLockShieldAction and JogLockReport.
    - **The team must be paid.** Free Personal Teams can't use Family Controls, which the app lock needs.
    - **The first build registers things.** Xcode registers the four extensions' bundle IDs, the App Group and the Family Controls (Development) capability. If a target shows a signing error, select it and click **Try Again** in Signing & Capabilities.
-   - **Your own bundle ID prefix?** Change it in all five targets; the extensions' IDs must start with the app's. Then change the App Group in `Config/*.entitlements` and `LockShared/LockStore.swift`.
+   - **Your own bundle ID prefix?** Change it in all six targets; the extensions' IDs must start with the app's. Then change the App Group in `Config/*.entitlements` and `LockShared/LockStore.swift`.
 3. Plug in your iPhone, select it as the run destination and press **Run** (⌘R). If iOS asks, turn on Developer Mode on the phone.
 4. Tap **Start run**, then allow:
    - **While Using the App**, with **Precise Location** on
@@ -154,6 +156,8 @@ These numbers come from a made-up noise model, so your jog decides which method 
   - iOS counts whole minutes of use, so part of a minute before **Lock again now** isn't taken.
   - iOS can report a minute of use, or the end of the day's unlock, a little late; sometimes not until a locked app is next opened.
   - While a website is blocked, Safari's private browsing is off (that's iOS's web filter, which also blocks it in Chrome).
+  - iOS can't count time on websites typed in by name. While banked minutes are being spent they're open with the apps and don't use minutes up, and the Time on apps card leaves them out.
+  - The Time on apps card is blank while iOS draws it, and comes from Screen Time's own numbers, which can lag a little.
   - Turning off Screen Time access for Jog Lock in Settings switches the lock off, unless a Screen Time passcode protects it.
 - **Force-quit:** swiping the app away stops tracking. If iOS ends the app itself, it relaunches and resumes the run on its own (the blue location pill stays on).
 
@@ -168,6 +172,7 @@ These numbers come from a made-up noise model, so your jog decides which method 
    - Give them the files in `JogLockMonitor/`, `JogLockShield/` and `JogLockShieldAction/`.
    - Add `LockShared/` and the `JogLockCore` package to the app and all three extensions.
    - Add the **Family Controls** and **App Groups** capabilities to all four.
+7. Time on apps needs a **Device Activity Report** extension: give it `JogLockReport/` and `ReportShared/`, add `ReportShared/` and the `JogLockCore` package to the app too, and give the extension **Family Controls** only (no App Group).
 
 ## Development
 
@@ -194,6 +199,8 @@ JogLockTracker/             the iPhone app
   RunActivityController.swift  starts and updates the lock-screen countdown
   AppLock.swift             the app lock: Screen Time access, picked apps, unlocks
   AppLockCard.swift         the lock on the home screen
+  WebsitesView.swift        websites typed in by name
+  TimeOnAppsCard.swift      the Time on apps card (the report extension draws its numbers)
   UnlockCelebration.swift   the unlock moment
   StrideStore.swift         the learned stride samples, kept on the phone
   RunStore+Device.swift     where runs are saved on the phone
@@ -206,6 +213,8 @@ LockShared/                 the lock's shared state, shield and monitor logic (f
 JogLockMonitor/             locks again when the day ends, counts banked minutes as they're used (DeviceActivity monitor)
 JogLockShield/              the shield: "TikTok is 1.8 km away"
 JogLockShieldAction/        the shield's buttons: Run now and Close
+JogLockReport/              Time on apps, from Screen Time (Device Activity Report extension)
+ReportShared/               the Time on apps view and filter, built into the app and the report extension
 Tools/
   replay.py                 re-run a log with any settings, compare, export GPX
   simulate.py               make synthetic runs

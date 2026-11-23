@@ -19,9 +19,11 @@ All notable changes to this project are listed here. The format follows [Keep a 
   - Borrowing 30 minutes from tomorrow for 1 km more tomorrow.
   - While locked, apps can only be added and the lock can't be turned off.
   - Websites are blocked in other browsers too (iOS's web filter).
+  - Websites typed in by name, for the ones the picker doesn't list (from Tilawah Key). Up to 40 in all; add-only while locked.
+  - Time on apps on the home screen, from Screen Time: a day on average this week against last week, what it would take to run for, and the apps used most. Drawn by a new Device Activity Report extension, JogLockReport; the app never sees the numbers.
   - Shareable lock diagnostics in Settings.
   - Rules in `LockLedger` and `LockState`, with tests; ADR-0005.
-- CI checks that each extension is built into the app with the right extension point and class.
+- CI checks that each extension is built into the app with the right extension point and class. It checks the report extension in the app's Extensions folder too.
 - The step check (anti-cheat): only GPS distance backed by steps, and not covered in a car or on a bike, counts toward unlocking. Run logs now include step and motion lines, and the stop event and run summary record what counted and what didn't.
 - Motion & Fitness permission, with a warning when it's off.
 - Treadmill mode: distance from steps × a stride length learned on your outdoor runs (or the iPhone's own estimate until then), with the same car, bike and standing-still checks.

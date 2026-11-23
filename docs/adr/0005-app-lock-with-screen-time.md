@@ -37,13 +37,17 @@ Take Tilawah Key's approach, with Jog Lock's rules.
   - Usage events go to an inbox first, so a busy lock never loses one.
 - **One "apply the state" for the shield**, from the app or the monitor, in one named store.
   - Chosen websites also go to iOS's web filter, which blocks them in Chrome and other browsers.
-  - At most 50 apps and 40 websites can be chosen.
+  - Websites can also be typed in by name (Tilawah Key's K10), for ones the picker doesn't list. They're kept as the domain the web filter takes (`instagram.com`, subdomains included) and get iOS's own "Restricted" page. A state saved before them reads with none.
+  - At most 50 apps and 40 websites, chosen and typed, can be locked.
 - **The app does its lock work on a background actor.** It catches up at launch, when it comes to the front, on the monitor's signal, when a monitor's time comes, and every minute while it's open.
 - **No easy way out while locked.** Apps can only be added, and the lock can only be turned off after the day's run. Settings explains Tilawah Key's "Strict" set-up: someone trusted keeps a Screen Time passcode.
 - **The shield** says "TikTok is 1.8 km away", with a line that changes each minute and the banked minutes.
   - Run now opens Jog Lock on iOS 26.5 and later (`openParentalControlsApp`, confirmed on Tilawah Key with an individual authorisation). Before 26.5 it sends a notification that opens the app.
   - Close closes the locked app.
 - **Diagnostics.** The app, the monitor and the shield each keep a short log in the App Group, shared from Settings. It holds counts, never which apps.
+- **Time on apps** (Tilawah Key's H5, D94). A Device Activity Report extension draws the home screen's card: a day on average this week against last week, and the five apps used most. With the lock on it reports on the locked apps; otherwise on every app.
+  - It's an ExtensionKit extension in the app's `Extensions` folder, with Family Controls and no App Group. iOS keeps the numbers inside it, so the app never sees them and nothing about them can reach the diagnostics.
+  - The extension can't say how tall it is, so the card is sized by the same view drawn hidden at its tallest. The report takes no touches, so the page scrolls over it (Tilawah Key's D95).
 
 ## Alternatives considered
 
@@ -56,5 +60,7 @@ Take Tilawah Key's approach, with Jog Lock's rules.
 - **A paid developer team is needed.** Family Controls isn't available to free Personal Teams. Before TestFlight or the App Store, Apple must also approve the Family Controls (Distribution) entitlement for the app and its extensions.
 - **iOS 17.4 or later is needed for usage counting.** Jog Lock needs iOS 18 anyway.
 - **iOS counts whole minutes**, so part of a minute before Lock again now isn't taken.
-- **Not brought over yet:** typed-in websites, the "time on apps" report and parent-managed protection.
-- **The App Group ID appears in four entitlements files and `LockShared/LockStore.swift`.**
+- **Not brought over:** parent-managed protection (not wanted).
+- **iOS can't count time on websites typed in by name.** While banked minutes are spent, they're open with the apps without using minutes up.
+- **The App Group ID appears in four entitlements files and `LockShared/LockStore.swift`.** The report extension has none.
+- **Six bundle IDs** need Apple's Family Controls (Distribution) approval before TestFlight: the app and its five extensions, `.Report` included.
