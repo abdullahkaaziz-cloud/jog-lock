@@ -51,6 +51,10 @@ final class RunTracker: NSObject, ObservableObject {
     @Published private(set) var runMode: RunMode = .outdoor
     @Published private(set) var strideModel: StrideModel?
     @Published private(set) var lastCadence: Double?
+    /// The counted route so far, for the live map.
+    @Published private(set) var route: [[Coordinate]] = []
+    /// Set when the step check has just thrown out distance ("nice try").
+    @Published private(set) var niceTry: NiceTryEvent?
 
     /// True from tapping Start until the run is stopped.
     var isActive: Bool { status != .idle }
@@ -66,6 +70,12 @@ final class RunTracker: NSObject, ObservableObject {
 
     private let manager = CLLocationManager()   // only used for permission prompts
     private var counter = RunCounter(start: 0)
+    private var routeBuilder = RouteBuilder()
+    private var coach = VoiceCoachPlanner()
+    private var coachVariant = 0
+    private var niceTryDetector = NiceTryDetector()
+    private let speaker = VoiceSpeaker()
+    private let liveActivity = RunActivityController()
     private var treadmill: TreadmillCounter?
     private let motion = MotionTracker()
     private var isStopping = false
@@ -146,6 +156,10 @@ final class RunTracker: NSObject, ObservableObject {
             gateTotals = counter.gate.totals
         }
         checkTargets(at: end, notifyUser: false)
+        progressChanged(at: end)
+        liveActivity.end(final: RunActivityAttributes.ContentState(
+            meters: gateTotals.countedMeters, targetMeters: runTargetKm * 1000,
+            unlocked: countedTargetReached, paused: false))
         logEvent("stop", totals: true)
         writer?.close()
         writer = nil
@@ -166,6 +180,10 @@ final class RunTracker: NSObject, ObservableObject {
 
     func clearWarning() {
         warning = nil
+    }
+
+    func clearNiceTry() {
+        niceTry = nil
     }
 
     private func startRun() async {
@@ -218,6 +236,11 @@ final class RunTracker: NSObject, ObservableObject {
             gateTotals = counter.gate.totals
         }
         lastCadence = nil
+        routeBuilder = RouteBuilder()
+        route = []
+        coach = VoiceCoachPlanner()
+        niceTryDetector = NiceTryDetector()
+        niceTry = nil
         startedAt = now
         countedTargetReached = false
         countedTargetAt = nil
@@ -243,6 +266,7 @@ final class RunTracker: NSObject, ObservableObject {
             status = .tracking
         }
         startMotion(from: now)
+        liveActivity.start(app: AppSettings.shared.nemesis, startedAt: now, targetMeters: runTargetKm * 1000)
     }
 
     private func startMotion(from start: Date) {
@@ -293,6 +317,12 @@ final class RunTracker: NSObject, ObservableObject {
         let decision = counter.add(GPSFix(location: location, stationary: stationary))
         snapshot = counter.engine.snapshot
         gateTotals = counter.gate.totals
+        let routeBefore = routeBuilder.segments.count
+        routeBuilder.add(Coordinate(lat: location.coordinate.latitude, lon: location.coordinate.longitude),
+                         decision: decision)
+        if decision == .accepted || routeBuilder.segments.count != routeBefore {
+            route = routeBuilder.segments
+        }
         lastAccuracy = location.horizontalAccuracy >= 0 ? location.horizontalAccuracy : nil
         writeFix(location, stationary: stationary, decision: decision)
 
@@ -309,6 +339,7 @@ final class RunTracker: NSObject, ObservableObject {
             logEvent("gpsReady")
         }
         checkTargets(at: location.timestamp, notifyUser: true)
+        progressChanged(at: location.timestamp)
     }
 
     private func handleSteps(_ sample: StepSample, meters: Double?, cadence: Double?) {
@@ -323,6 +354,7 @@ final class RunTracker: NSObject, ObservableObject {
         lastCadence = cadence
         writeSteps(sample, meters: meters, cadence: cadence, detail: nil)
         checkTargets(at: Date(timeIntervalSince1970: sample.t), notifyUser: true)
+        progressChanged(at: Date(timeIntervalSince1970: sample.t))
     }
 
     private func handleMotion(_ sample: MotionSample) {
@@ -354,6 +386,33 @@ final class RunTracker: NSObject, ObservableObject {
                 logEvent("diagnostic", detail: message)
             }
         }
+    }
+
+    // MARK: - Voice coach and "nice try"
+
+    /// After every change in distance: the voice coach, "nice try" cards and the lock-screen countdown.
+    private func progressChanged(at time: Date) {
+        if let event = niceTryDetector.check(gateTotals, at: time.timeIntervalSince1970) {
+            niceTry = event
+            logEvent("niceTry", detail: event.kind.rawValue)
+            say(.niceTry(event.kind))
+        }
+        let live = gateTotals.countedMeters + gateTotals.pendingMeters
+        if let cue = coach.cue(meters: live, target: runTargetKm * 1000, unlocked: countedTargetReached) {
+            say(cue)
+        }
+        liveActivity.update(meters: live, targetMeters: runTargetKm * 1000,
+                            unlocked: countedTargetReached, paused: status == .paused)
+    }
+
+    private func say(_ cue: VoiceCue) {
+        let settings = AppSettings.shared
+        guard settings.voiceOn else { return }
+        let live = gateTotals.countedMeters + gateTotals.pendingMeters
+        let line = VoiceLines.text(for: cue, app: settings.nemesis,
+                                   remainingMeters: max(0, runTargetKm * 1000 - live), variant: coachVariant)
+        coachVariant += 1
+        speaker.speak(line, style: settings.voiceStyle)
     }
 
     private func checkTargets(at time: Date, notifyUser: Bool) {
@@ -447,6 +506,7 @@ final class RunTracker: NSObject, ObservableObject {
             status = .tracking
         }
         startMotion(from: runStart)
+        liveActivity.reattach()
     }
 
     // MARK: - Stride model (treadmill mode)
