@@ -16,6 +16,7 @@ struct AppLockCard: View {
     @State private var draft = FamilyActivitySelection()
     @State private var confirmBorrow = false
     @State private var confirmOff = false
+    @State private var editingWebsites = false
 
     var body: some View {
         Group {
@@ -29,6 +30,10 @@ struct AppLockCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
         .familyActivityPicker(isPresented: $picking, selection: $draft)
+        .sheet(isPresented: $editingWebsites) {
+            WebsitesView()
+                .environmentObject(lock)
+        }
         .onChange(of: picking) { _, isOpen in
             if !isOpen {
                 lock.choose(draft)
@@ -98,7 +103,7 @@ struct AppLockCard: View {
             if lock.accessOff {
                 accessOff
             }
-            LockedAppsRow(selection: lock.selection)
+            LockedAppsRow(selection: lock.selection, websites: lock.websites)
             if ledger.owedMeters > 0 && !ledger.isTargetMet {
                 Text("Today's \(Format.shortDistance(ledger.targetMeters)) includes \(Format.shortDistance(ledger.owedMeters)) you borrowed.")
                     .font(.footnote)
@@ -134,6 +139,11 @@ struct AppLockCard: View {
                 chooseApps()
             } label: {
                 Label(lock.isLocked ? "Add apps" : "Change apps", systemImage: "apps.iphone")
+            }
+            Button {
+                editingWebsites = true
+            } label: {
+                Label(lock.isLocked ? "Add websites" : "Websites", systemImage: "globe")
             }
             Button(role: .destructive) {
                 if lock.isLocked {
@@ -212,9 +222,11 @@ struct AppLockCard: View {
     }
 }
 
-/// The chosen apps' icons. iOS draws them; Jog Lock never learns which apps they are.
+/// The chosen apps' icons, and the websites typed in. iOS draws the icons;
+/// Jog Lock never learns which apps they are.
 struct LockedAppsRow: View {
     let selection: FamilyActivitySelection
+    var websites: [String] = []
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -236,6 +248,14 @@ struct LockedAppsRow: View {
                         .labelStyle(.iconOnly)
                         .scaleEffect(1.5)
                         .frame(width: 40, height: 40)
+                }
+                ForEach(websites, id: \.self) { site in
+                    Label(site, systemImage: "globe")
+                        .font(.caption)
+                        .lineLimit(1)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.quaternary, in: Capsule())
                 }
             }
             .padding(.vertical, 4)

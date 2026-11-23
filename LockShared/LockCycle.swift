@@ -194,7 +194,7 @@ final class LockCycle {
             note = "lock busy: event kept"
             if let saved = LockStore.peek(), saved.enabled, saved.ledger.usesUp(monitor: name, event: event),
                let data = saved.selection, let selection = try? LockShield.decode(data) {
-                LockShield.shield(selection)
+                LockShield.shield(selection, websites: saved.websites)
                 note += ", minutes used up, apps shielded"
             }
             do {
@@ -230,7 +230,7 @@ final class LockCycle {
         } catch LockFailure.busy {
             if let saved = LockStore.peek(), saved.enabled, saved.ledger.monitor?.name == name,
                let data = saved.selection, let selection = try? LockShield.decode(data) {
-                LockShield.shield(selection)
+                LockShield.shield(selection, websites: saved.websites)
                 return "lock busy: apps shielded until the app refreshes"
             }
             return "lock busy"
@@ -320,6 +320,17 @@ final class LockCycle {
         try registerMonitor()
     }
 
+    /// The websites typed in. The app checks that, while the apps are
+    /// locked, they're only added to.
+    func setWebsites(_ websites: [String]) throws {
+        try transaction { state in
+            state.websites = TypedWebsite.cleaned(websites)
+            if state.enabled {
+                try LockShield.apply(state)
+            }
+        }
+    }
+
     /// The daily distance. While the lock is on, today's target stays and
     /// the new one starts tomorrow.
     func setDailyMeters(_ meters: Double) throws {
@@ -352,7 +363,7 @@ final class LockCycle {
                 entry["monitor_counted"] = "\(monitor.counted) of \(monitor.base)"
             }
         }
-        if let counts = LockShield.counts(state.selection) {
+        if let counts = LockShield.counts(state) {
             entry["chosen"] = counts
         }
         return entry

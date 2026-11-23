@@ -21,6 +21,7 @@ private actor LockRuntime {
     enum Command {
         case snapshot, refresh, turnOff, spend, stopSpending, borrow
         case choose(Data)
+        case websites([String])
         case credit(String, Double, Date)
         case dailyMeters(Double)
 
@@ -33,6 +34,7 @@ private actor LockRuntime {
             case .stopSpending: "lock again"
             case .borrow: "borrow"
             case .choose: "choose apps"
+            case .websites: "websites"
             case .credit: "credit run"
             case .dailyMeters: "daily target"
             }
@@ -42,7 +44,7 @@ private actor LockRuntime {
         /// up, crediting runs) only go to the diagnostics.
         var showsErrors: Bool {
             switch self {
-            case .turnOff, .spend, .stopSpending, .borrow, .choose: true
+            case .turnOff, .spend, .stopSpending, .borrow, .choose, .websites: true
             case .snapshot, .refresh, .credit, .dailyMeters: false
             }
         }
@@ -73,6 +75,8 @@ private actor LockRuntime {
                 try cycle.borrow()
             case .choose(let selection):
                 try cycle.choose(selection)
+            case .websites(let websites):
+                try cycle.setWebsites(websites)
             case .credit(let id, let meters, let time):
                 outcome.unlocked = try cycle.credit(run: id, countedMeters: meters, at: time)
             case .dailyMeters(let meters):
@@ -125,9 +129,18 @@ final class AppLock: ObservableObject {
     var ledger: LockLedger { state.ledger }
     var rules: LockRules { state.rules }
 
-    var hasChosenApps: Bool {
+    /// Apps, categories or websites chosen in Screen Time's picker.
+    var hasPickedApps: Bool {
         !selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty || !selection.webDomainTokens.isEmpty
     }
+
+    /// Anything to lock: picked, or websites typed in.
+    var hasChosenApps: Bool {
+        hasPickedApps || !state.websites.isEmpty
+    }
+
+    /// Websites typed in by name, locked with the apps.
+    var websites: [String] { state.websites }
 
     var isAuthorized: Bool {
         authorization == .approved
@@ -257,7 +270,7 @@ final class AppLock: ObservableObject {
     /// The apps picked in Screen Time's picker: turns the lock on, or
     /// changes its apps. While they're locked, apps can only be added.
     func choose(_ newSelection: FamilyActivitySelection) {
-        if let reason = LockShield.problem(with: newSelection) {
+        if let reason = LockShield.problem(with: newSelection, websites: state.websites) {
             if hasChosenApps {
                 problem = reason
             }
@@ -280,6 +293,38 @@ final class AppLock: ObservableObject {
         new.applicationTokens.isSuperset(of: old.applicationTokens)
             && new.categoryTokens.isSuperset(of: old.categoryTokens)
             && new.webDomainTokens.isSuperset(of: old.webDomainTokens)
+    }
+
+    /// Adds a website typed in by name. Returns why it couldn't be added, to
+    /// show by the text field, or nil once it's added.
+    func addWebsite(_ text: String) -> String? {
+        switch TypedWebsite.adding(text, to: state.websites, picked: selection.webDomainTokens.count) {
+        case .failure(.notAWebsite):
+            return "Type a website's address, like instagram.com."
+        case .failure(.alreadyBlocked(let domain)):
+            return "\(domain) is already locked."
+        case .failure(.tooMany):
+            return "Up to \(LockShield.websiteLimit) websites in all, chosen and typed."
+        case .success(let domain):
+            saveWebsites(state.websites + [domain], trigger: "website added")
+            return nil
+        }
+    }
+
+    /// Removes websites typed in. While the apps are locked they can only be
+    /// added to, like the apps.
+    func removeWebsites(_ domains: [String]) {
+        let kept = state.websites.filter { !domains.contains($0) }
+        guard !isLocked || TypedWebsite.adds(kept, to: state.websites) else {
+            problem = "While your apps are locked you can only add websites. Run today's distance, then you can remove some."
+            return
+        }
+        saveWebsites(kept, trigger: "website removed")
+    }
+
+    private func saveWebsites(_ websites: [String], trigger: String) {
+        state.websites = websites       // shown now, saved by the runtime
+        Task { await perform(.websites(websites), trigger: trigger) }
     }
 
     func turnOff() {
