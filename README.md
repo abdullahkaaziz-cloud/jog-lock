@@ -10,7 +10,7 @@ This test app measures jog distance with Core Location's fitness updates, then c
 
 The app saves every GPS point to a log, so a run can be replayed later with different settings without running again.
 
-There's no app blocking in this build, only the distance tracking.
+It also locks the apps you choose until you've run the day's distance: see [App lock](#app-lock).
 
 ## The step check (anti-cheat)
 
@@ -22,6 +22,20 @@ Only distance you cover on foot counts toward unlocking. The app checks the GPS 
 - **Motion & Fitness must be on.** Without it there are no steps, so nothing counts. The app says so at the start of a run.
 
 The live screen and run details show what counted and what didn't (too few steps, or car or bike). Walking counts the same as running.
+
+## App lock
+
+Tap **Choose apps to lock** on the home screen. iOS asks for Screen Time access (Face ID or passcode), then shows its own app picker. Jog Lock never learns which apps you picked; iOS draws their icons.
+
+- **Locked each day until you've run.** The apps lock again every midnight. Runs add up during the day, using counted distance only (after the step check). When they reach the daily target, the apps are open until midnight.
+- **The unlock moment.** The run that meets the target opens the apps straight away, mid-run. When you next open Jog Lock you get a full-screen celebration: the lock pops, the apps' icons spring out, confetti falls and the phone buzzes. The voice coach says it out loud during the run.
+- **"TikTok is 1.8 km away".** Opening a locked app shows Jog Lock's shield with how far you still have to run. "Fine, I'll run" closes the app.
+- **Banked minutes.** Every kilometre past the day's target banks 15 minutes, up to 2 hours. Spend them on another day in unlocks of 15, 30 or 60 minutes. iOS can't time less than 15.
+- **Borrow from tomorrow.** Once a day you can open your apps for 30 minutes now, and tomorrow's target goes up by 1 km. Distance you don't run carries over, and borrowing stops once you owe 3 km.
+- **Changing the target** while the lock is on takes effect tomorrow, so you can't lower it to unlock today.
+- **Turning the lock off** (the ⋯ menu on the card) opens everything straight away. Banked minutes and borrowed distance are kept.
+
+It needs a paid Apple Developer team, because free Personal Teams can't use Family Controls. See [Put it on your iPhone](#put-it-on-your-iphone).
 
 ## Maps, voice coach and sharing
 
@@ -47,13 +61,16 @@ Treadmill distance is an estimate: expect it within a few per cent once your str
 You need Xcode 16 or later (Xcode 26 is fine) and an iPhone on iOS 18 or later.
 
 1. Open `JogLockTracker.xcodeproj`.
-2. Click the **JogLockTracker** target, then open **Signing & Capabilities**.
-   - Pick your **Team**.
-   - Change the **Bundle Identifier** from `com.yourname.joglock.tracker` to your own prefix.
+2. Signing is automatic, with the team already set in the project.
+   - **Another team?** Pick it in **Signing & Capabilities** for each of the five targets: JogLockTracker, JogLockWidgets, JogLockMonitor, JogLockShield and JogLockShieldAction.
+   - **The team must be paid.** Free Personal Teams can't use Family Controls, which the app lock needs.
+   - **The first build registers things.** Xcode registers the four extensions' bundle IDs, the App Group and the Family Controls (Development) capability. If a target shows a signing error, select it and click **Try Again** in Signing & Capabilities.
+   - **Your own bundle ID prefix?** Change it in all five targets; the extensions' IDs must start with the app's. Then change the App Group in `Config/*.entitlements` and `LockShared/LockStore.swift`.
 3. Plug in your iPhone, select it as the run destination and press **Run** (⌘R). If iOS asks, turn on Developer Mode on the phone.
 4. Tap **Start run**, then allow:
    - **While Using the App**, with **Precise Location** on
    - notifications
+5. To try the lock, tap **Choose apps to lock** and allow Screen Time access.
 
 Background location and the permission texts are already set up in `Config/Info.plist`.
 
@@ -126,6 +143,11 @@ These numbers come from a made-up noise model, so your jog decides which method 
 
 - **Determined cheating:** the step check stops driving and cycling, but someone shaking the phone in a slow car could fool it if Core Motion misses the car. Jogging and driving in short turns adds at most about 10% of the driven distance.
 - **Treadmill:** distance is steps × your learned stride, so it can't be checked against GPS. Someone could shake the phone by hand; the cadence limit and Core Motion's activity make that slower than running.
+- **App lock:**
+  - iOS doesn't let a shield open Jog Lock, so "Fine, I'll run" only closes the locked app.
+  - A shield can take a moment to change after an unlock.
+  - iOS sometimes runs the end-of-unlock re-lock only when a locked app is next opened.
+  - Turning off Screen Time access for Jog Lock in Settings switches the lock off.
 - **Force-quit:** swiping the app away stops tracking. If iOS ends the app itself, it relaunches and resumes the run on its own (the blue location pill stays on).
 
 ## If Xcode won't open the project
@@ -135,6 +157,10 @@ These numbers come from a made-up noise model, so your jog decides which method 
 3. Copy the keys from `Config/Info.plist` into the target's **Info** tab.
 4. In **Signing & Capabilities**, add **Background Modes** and tick **Location updates**.
 5. Set **iOS Deployment Target** to 18.0.
+6. The app lock needs three more targets (**File > New > Target**): a Device Activity Monitor extension, a Shield Configuration extension and a Shield Action extension.
+   - Give them the files in `JogLockMonitor/`, `JogLockShield/` and `JogLockShieldAction/`.
+   - Add `LockShared/` to the app, the monitor and the shield.
+   - Add the **Family Controls** capability to all four, and **App Groups** to all but the shield action.
 
 ## Development
 
@@ -145,11 +171,13 @@ Changes go through branches and pull requests, with CI on each one. See [CONTRIB
 ```
 JogLockTracker.xcodeproj    Xcode project (Xcode 16+), with a shared scheme
 Config/Info.plist           permissions, background location, Files app access
+Config/*.entitlements       Family Controls and the App Group, for the app and its extensions
 Packages/JogLockCore/       logic that doesn't need an iPhone, tested with `swift test`
   DistanceEngine.swift      clean-up rules + the three distance estimates
   StepGate.swift            the step check: GPS distance must be backed by steps
   RunCounter.swift          engine + step check, fed in arrival order; rebuilds a run from its log
   Treadmill.swift           treadmill distance from steps, and the stride model learned on GPS runs
+  LockLedger.swift          the app lock's rules: daily target, banked minutes, borrowing
   Format.swift              how distances and times are shown
   RunLog.swift              log line and run summary formats
   RunStore.swift            run files (raw.jsonl, summary.json, GPX export)
@@ -157,13 +185,20 @@ JogLockTracker/             the iPhone app
   RunTracker.swift          location stream, background session, logging, alerts, resume
   MotionTracker.swift       steps and motion activity from Core Motion
   RunActivityController.swift  starts and updates the lock-screen countdown
+  AppLock.swift             the app lock: Screen Time access, picked apps, unlocks
+  AppLockCard.swift         the lock on the home screen
+  UnlockCelebration.swift   the unlock moment
   StrideStore.swift         the learned stride samples, kept on the phone
   RunStore+Device.swift     where runs are saved on the phone
   ContentView.swift         live screen
   RunListView.swift         past runs, notes, sharing
   JogLockTrackerApp.swift   app entry, notification banners
 JogLockWidgets/             widget extension: the lock-screen / Dynamic Island countdown
-Shared/                     code built into both the app and its extensions
+Shared/                     code built into the app and the widget extension
+LockShared/                 the lock's shared state and shield, built into the app and its Screen Time extensions
+JogLockMonitor/             re-locks at midnight and when an unlock ends (DeviceActivity monitor)
+JogLockShield/              the shield: "TikTok is 1.8 km away"
+JogLockShieldAction/        the shield's button
 Tools/
   replay.py                 re-run a log with any settings, compare, export GPX
   simulate.py               make synthetic runs

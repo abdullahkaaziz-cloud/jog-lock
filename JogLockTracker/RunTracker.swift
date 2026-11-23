@@ -5,6 +5,7 @@
 //  Runs a jog: asks for location access, streams Core Location fitness
 //  updates (also with the screen locked), feeds them to DistanceEngine,
 //  logs every fix, and tells you when the target distance is reached.
+//  Counted distance goes to the app lock as the run goes.
 //
 //  If iOS kills the app mid-run, it relaunches it in the background for the
 //  next location update; the run resumes by replaying its own log.
@@ -41,7 +42,10 @@ final class RunTracker: NSObject, ObservableObject {
     @Published private(set) var diagnostic: String?
     @Published private(set) var lastFinishedRun: RunSummary?
     @Published var targetKm: Double {
-        didSet { UserDefaults.standard.set(targetKm, forKey: Keys.targetKm) }
+        didSet {
+            UserDefaults.standard.set(targetKm, forKey: Keys.targetKm)
+            AppLock.shared.setDailyKm(targetKm)
+        }
     }
     /// The mode the next run starts in.
     @Published var mode: RunMode {
@@ -96,6 +100,7 @@ final class RunTracker: NSObject, ObservableObject {
         targetKm = saved > 0 ? saved : 1.0
         mode = RunMode(rawValue: UserDefaults.standard.string(forKey: Keys.mode) ?? "") ?? .outdoor
         super.init()
+        AppLock.shared.setDailyKm(targetKm)
         manager.delegate = self
         observeAppState()
         resumeIfNeeded()
@@ -157,6 +162,7 @@ final class RunTracker: NSObject, ObservableObject {
         }
         checkTargets(at: end, notifyUser: false)
         progressChanged(at: end)
+        AppLock.shared.credit(run: id, countedMeters: gateTotals.countedMeters, at: end, finished: true)
         liveActivity.end(final: RunActivityAttributes.ContentState(
             meters: gateTotals.countedMeters, targetMeters: runTargetKm * 1000,
             unlocked: countedTargetReached, paused: false))
@@ -223,7 +229,8 @@ final class RunTracker: NSObject, ObservableObject {
 
         let now = Date()
         runID = id
-        runTargetKm = targetKm
+        // With the app lock on, the run is what's left of today's target.
+        runTargetKm = AppLock.shared.runTargetKm(default: targetKm)
         runMode = newMode
         counter = RunCounter(start: now.timeIntervalSince1970)
         snapshot = counter.engine.snapshot
@@ -390,8 +397,12 @@ final class RunTracker: NSObject, ObservableObject {
 
     // MARK: - Voice coach and "nice try"
 
-    /// After every change in distance: the voice coach, "nice try" cards and the lock-screen countdown.
+    /// After every change in distance: the app lock, the voice coach, "nice try" cards and the
+    /// lock-screen countdown.
     private func progressChanged(at time: Date) {
+        if let runID {
+            AppLock.shared.credit(run: runID, countedMeters: gateTotals.countedMeters, at: time)
+        }
         if let event = niceTryDetector.check(gateTotals, at: time.timeIntervalSince1970) {
             niceTry = event
             logEvent("niceTry", detail: event.kind.rawValue)
@@ -423,8 +434,13 @@ final class RunTracker: NSObject, ObservableObject {
             logEvent("targetReached", detail: "counted")
             if notifyUser {
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
-                notify(title: "\(Format.km(runTargetKm)) km reached - apps unlocked",
-                       body: "Your steps check out. Note where you are.")
+                if AppLock.shared.isEnabled {
+                    notify(title: "Unlocked! Today's run is done",
+                           body: "\(AppSettings.shared.nemesis) is all yours. Keep going to bank minutes for another day.")
+                } else {
+                    notify(title: "\(Format.km(runTargetKm)) km reached - apps unlocked",
+                           body: "Your steps check out. Note where you are.")
+                }
             }
         }
         // GPS distance before the step check, logged for comparison.

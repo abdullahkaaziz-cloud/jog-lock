@@ -8,6 +8,8 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var tracker: RunTracker
+    @EnvironmentObject private var lock: AppLock
+    @Environment(\.scenePhase) private var scenePhase
     @State private var confirmStop = false
     @State private var showSettings = false
 
@@ -31,9 +33,11 @@ struct ContentView: View {
                         }
                     }
 
-                    DistanceRing(meters: tracker.gateTotals.countedMeters + tracker.gateTotals.pendingMeters,
-                                 targetKm: tracker.isActive ? tracker.runTargetKm : tracker.targetKm,
-                                 reached: tracker.countedTargetReached && tracker.isActive)
+                    let ring = ringValues
+                    DistanceRing(meters: ring.meters, targetKm: ring.targetKm, reached: ring.reached)
+                    if !tracker.isActive {
+                        AppLockCard()
+                    }
 
                     statsRow
                     if tracker.isActive && tracker.runMode == .outdoor {
@@ -84,6 +88,16 @@ struct ContentView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
             }
+            .fullScreenCover(isPresented: $lock.celebrating) {
+                UnlockCelebrationView(selection: lock.selection, app: AppSettings.shared.nemesis) {
+                    lock.celebrating = false
+                }
+            }
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                if phase == .active {
+                    lock.refresh()
+                }
+            }
             .confirmationDialog("Stop this run?", isPresented: $confirmStop, titleVisibility: .visible) {
                 Button("Stop and save", role: .destructive) { tracker.stop() }
                 Button("Keep going", role: .cancel) {}
@@ -92,6 +106,20 @@ struct ContentView: View {
     }
 
     // MARK: - Pieces
+
+    /// During a run: this run against what it needs. Otherwise, with the
+    /// lock on: today's running against today's target.
+    private var ringValues: (meters: Double, targetKm: Double, reached: Bool) {
+        let live = tracker.gateTotals.countedMeters + tracker.gateTotals.pendingMeters
+        if tracker.isActive {
+            return (live, tracker.runTargetKm, tracker.countedTargetReached)
+        }
+        if lock.isEnabled {
+            let ledger = lock.ledger
+            return (ledger.ranMeters, ledger.targetMeters / 1_000, ledger.isTargetMet)
+        }
+        return (live, tracker.targetKm, false)
+    }
 
     private var statusPill: some View {
         HStack(spacing: 8) {
@@ -202,12 +230,19 @@ struct ContentView: View {
     }
 
     private var targetStepper: some View {
-        Stepper(value: $tracker.targetKm, in: 0.25...20, step: 0.25) {
-            HStack {
-                Label("Unlock target", systemImage: "lock.fill")
-                Spacer()
-                Text("\(Format.km(tracker.targetKm)) km")
-                    .monospacedDigit()
+        VStack(alignment: .leading, spacing: 6) {
+            Stepper(value: $tracker.targetKm, in: 0.25...20, step: 0.25) {
+                HStack {
+                    Label(lock.isEnabled ? "Daily target" : "Unlock target", systemImage: "lock.fill")
+                    Spacer()
+                    Text("\(Format.km(tracker.targetKm)) km")
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if lock.isEnabled && abs(lock.ledger.targetMeters - lock.ledger.owedMeters - lock.rules.dailyMeters) > 1 {
+                Text("Today stays at \(Format.shortDistance(lock.ledger.targetMeters)). The new target starts tomorrow.")
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }
@@ -470,4 +505,5 @@ struct Banner: View {
 #Preview {
     ContentView()
         .environmentObject(RunTracker.shared)
+        .environmentObject(AppLock.shared)
 }

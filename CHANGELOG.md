@@ -11,6 +11,14 @@ All notable changes to this project are listed here. The format follows [Keep a 
 - "Nice try" cards (shareable) when the step check throws out distance.
 - Story-sized share card for each run.
 - Lock-screen and Dynamic Island countdown during a run (Live Activity).
+- The app lock (Screen Time):
+  - Pick apps to lock; they stay locked each day until you've run the daily target.
+  - A shield on locked apps saying how far away they are ("TikTok is 1.8 km away").
+  - An unlock celebration.
+  - Banked minutes (15 a kilometre past the target) to spend on another day.
+  - Borrowing 30 minutes from tomorrow for 1 km more tomorrow.
+  - Rules in `LockLedger`, with tests; ADR-0005.
+- CI checks that each extension is built into the app with the right extension point and class.
 - The step check (anti-cheat): only GPS distance backed by steps, and not covered in a car or on a bike, counts toward unlocking. Run logs now include step and motion lines, and the stop event and run summary record what counted and what didn't.
 - Motion & Fitness permission, with a warning when it's off.
 - Treadmill mode: distance from steps × a stride length learned on your outdoor runs (or the iPhone's own estimate until then), with the same car, bike and standing-still checks.
