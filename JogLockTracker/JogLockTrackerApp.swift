@@ -2,8 +2,9 @@
 //  JogLockTrackerApp.swift
 //  JogLockTracker
 //
-//  Test build of Jog Lock's distance tracking (approach 1: Core Location
-//  with Strava-style clean-up). No app blocking here, just the distance.
+//  Jog Lock: run today's distance to unlock the apps you chose. Distance
+//  comes from Core Location with Strava-style clean-up, checked against
+//  your steps; the locking is Screen Time (see AppLock).
 //
 
 import SwiftUI
@@ -14,11 +15,13 @@ import UserNotifications
 struct JogLockTrackerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var tracker = RunTracker.shared
+    @StateObject private var lock = AppLock.shared
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(tracker)
+                .environmentObject(lock)
         }
     }
 }
