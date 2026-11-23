@@ -9,6 +9,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var tracker: RunTracker
     @State private var confirmStop = false
+    @State private var showSettings = false
 
     var body: some View {
         NavigationStack {
@@ -24,12 +25,22 @@ struct ContentView: View {
                     if let diagnostic = tracker.diagnostic {
                         Banner(text: diagnostic, systemImage: "location.slash.fill", tint: .red, onClose: nil)
                     }
+                    if let niceTry = tracker.niceTry {
+                        NiceTryBanner(kind: niceTry.kind, meters: niceTry.meters) {
+                            tracker.clearNiceTry()
+                        }
+                    }
 
                     DistanceRing(meters: tracker.gateTotals.countedMeters + tracker.gateTotals.pendingMeters,
                                  targetKm: tracker.isActive ? tracker.runTargetKm : tracker.targetKm,
                                  reached: tracker.countedTargetReached && tracker.isActive)
 
                     statsRow
+                    if tracker.isActive && tracker.runMode == .outdoor {
+                        RouteMap(segments: tracker.route, followsUser: true)
+                            .frame(height: 220)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                    }
                     comparisonCard
 
                     if !tracker.isActive {
@@ -44,6 +55,7 @@ struct ContentView: View {
 
                     if !tracker.isActive, let run = tracker.lastFinishedRun {
                         lastRunCard(run)
+                        ShareRunButton(run: run)
                     }
 
                     if !tracker.isActive {
@@ -54,6 +66,13 @@ struct ContentView: View {
             }
             .navigationTitle("Jog Tracker")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
                         RunListView()
@@ -61,6 +80,9 @@ struct ContentView: View {
                         Label("Runs", systemImage: "list.bullet")
                     }
                 }
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
             }
             .confirmationDialog("Stop this run?", isPresented: $confirmStop, titleVisibility: .visible) {
                 Button("Stop and save", role: .destructive) { tracker.stop() }
