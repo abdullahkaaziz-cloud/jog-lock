@@ -485,12 +485,30 @@ public struct LockState: Codable, Equatable, Sendable {
     public var schema = 1
     public var enabled = false
     public var selection: Data?
+    /// Websites typed in by name (`TypedWebsite.domain`), locked with the
+    /// chosen apps by iOS's web filter.
+    public var websites: [String] = []
     public var rules: LockRules
     public var ledger: LockLedger
 
     public init(now: Date, rules: LockRules = LockRules(), calendar: Calendar = .current) {
         self.rules = rules
         ledger = LockLedger(day: rules.day(of: now, calendar: calendar), rules: rules)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schema, enabled, selection, websites, rules, ledger
+    }
+
+    /// A state saved before typed websites reads with none.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schema = try container.decode(Int.self, forKey: .schema)
+        enabled = try container.decode(Bool.self, forKey: .enabled)
+        selection = try container.decodeIfPresent(Data.self, forKey: .selection)
+        websites = try container.decodeIfPresent([String].self, forKey: .websites) ?? []
+        rules = try container.decode(LockRules.self, forKey: .rules)
+        ledger = try container.decode(LockLedger.self, forKey: .ledger)
     }
 
     /// A saved state this build can trust. Anything else fails closed: the
