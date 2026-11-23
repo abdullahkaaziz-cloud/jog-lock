@@ -23,6 +23,13 @@ Only distance you cover on foot counts toward unlocking. The app checks the GPS 
 
 The live screen and run details show what counted and what didn't (too few steps, or car or bike). Walking counts the same as running.
 
+## Maps, voice coach and sharing
+
+- **Maps.** The live screen shows your route as you run. Each run's details open with its route, and the map button on the Runs screen shows everywhere you've run.
+- **Voice coach.** Every 500 m, at halfway, near the end and at the unlock, a voice line like "TikTok is getting closer. 1.8 kilometres to go." Pick the app you're running for and a voice (Chipmunk, Robot, Movie trailer, Normal) in Settings (gear icon). Music ducks while it talks.
+- **Nice try.** When the step check throws out distance (car, bike, or GPS distance without the steps), a "Nice try." card appears and the coach says so. The card can be shared.
+- **Share card.** After a run, "Share this run" makes a story-sized image (1080 × 1920): your route as line art, the distance, time and pace.
+
 ## Treadmill mode
 
 Pick **Treadmill** before starting. There's no GPS indoors, so distance comes from your steps:
