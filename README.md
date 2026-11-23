@@ -28,6 +28,7 @@ The live screen and run details show what counted and what didn't (too few steps
 - **Maps.** The live screen shows your route as you run. Each run's details open with its route, and the map button on the Runs screen shows everywhere you've run.
 - **Voice coach.** Every 500 m, at halfway, near the end and at the unlock, a voice line like "TikTok is getting closer. 1.8 kilometres to go." Pick the app you're running for and a voice (Chipmunk, Robot, Movie trailer, Normal) in Settings (gear icon). Music ducks while it talks.
 - **Nice try.** When the step check throws out distance (car, bike, or GPS distance without the steps), a "Nice try." card appears and the coach says so. The card can be shared.
+- **Lock-screen countdown.** During a run the lock screen and Dynamic Island show "0.8 km to TikTok", a progress bar and the time. It stays on the lock screen for 15 minutes after the run.
 - **Share card.** After a run, "Share this run" makes a story-sized image (1080 × 1920): your route as line art, the distance, time and pace.
 
 ## Treadmill mode
@@ -155,11 +156,14 @@ Packages/JogLockCore/       logic that doesn't need an iPhone, tested with `swif
 JogLockTracker/             the iPhone app
   RunTracker.swift          location stream, background session, logging, alerts, resume
   MotionTracker.swift       steps and motion activity from Core Motion
+  RunActivityController.swift  starts and updates the lock-screen countdown
   StrideStore.swift         the learned stride samples, kept on the phone
   RunStore+Device.swift     where runs are saved on the phone
   ContentView.swift         live screen
   RunListView.swift         past runs, notes, sharing
   JogLockTrackerApp.swift   app entry, notification banners
+JogLockWidgets/             widget extension: the lock-screen / Dynamic Island countdown
+Shared/                     code built into both the app and its extensions
 Tools/
   replay.py                 re-run a log with any settings, compare, export GPX
   simulate.py               make synthetic runs

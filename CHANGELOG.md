@@ -10,6 +10,7 @@ All notable changes to this project are listed here. The format follows [Keep a 
 - A voice coach with funny lines every 500 m, at halfway, near the end and at the unlock, in a choice of voices. Settings for the voice and the app you're running for.
 - "Nice try" cards (shareable) when the step check throws out distance.
 - Story-sized share card for each run.
+- Lock-screen and Dynamic Island countdown during a run (Live Activity).
 - The step check (anti-cheat): only GPS distance backed by steps, and not covered in a car or on a bike, counts toward unlocking. Run logs now include step and motion lines, and the stop event and run summary record what counted and what didn't.
 - Motion & Fitness permission, with a warning when it's off.
 - Treadmill mode: distance from steps × a stride length learned on your outdoor runs (or the iPhone's own estimate until then), with the same car, bike and standing-still checks.

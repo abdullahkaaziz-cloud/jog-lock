@@ -75,6 +75,7 @@ final class RunTracker: NSObject, ObservableObject {
     private var coachVariant = 0
     private var niceTryDetector = NiceTryDetector()
     private let speaker = VoiceSpeaker()
+    private let liveActivity = RunActivityController()
     private var treadmill: TreadmillCounter?
     private let motion = MotionTracker()
     private var isStopping = false
@@ -155,7 +156,10 @@ final class RunTracker: NSObject, ObservableObject {
             gateTotals = counter.gate.totals
         }
         checkTargets(at: end, notifyUser: false)
-        updateCoach(at: end)
+        progressChanged(at: end)
+        liveActivity.end(final: RunActivityAttributes.ContentState(
+            meters: gateTotals.countedMeters, targetMeters: runTargetKm * 1000,
+            unlocked: countedTargetReached, paused: false))
         logEvent("stop", totals: true)
         writer?.close()
         writer = nil
@@ -262,6 +266,7 @@ final class RunTracker: NSObject, ObservableObject {
             status = .tracking
         }
         startMotion(from: now)
+        liveActivity.start(app: AppSettings.shared.nemesis, startedAt: now, targetMeters: runTargetKm * 1000)
     }
 
     private func startMotion(from start: Date) {
@@ -334,7 +339,7 @@ final class RunTracker: NSObject, ObservableObject {
             logEvent("gpsReady")
         }
         checkTargets(at: location.timestamp, notifyUser: true)
-        updateCoach(at: location.timestamp)
+        progressChanged(at: location.timestamp)
     }
 
     private func handleSteps(_ sample: StepSample, meters: Double?, cadence: Double?) {
@@ -349,7 +354,7 @@ final class RunTracker: NSObject, ObservableObject {
         lastCadence = cadence
         writeSteps(sample, meters: meters, cadence: cadence, detail: nil)
         checkTargets(at: Date(timeIntervalSince1970: sample.t), notifyUser: true)
-        updateCoach(at: Date(timeIntervalSince1970: sample.t))
+        progressChanged(at: Date(timeIntervalSince1970: sample.t))
     }
 
     private func handleMotion(_ sample: MotionSample) {
@@ -385,7 +390,8 @@ final class RunTracker: NSObject, ObservableObject {
 
     // MARK: - Voice coach and "nice try"
 
-    private func updateCoach(at time: Date) {
+    /// After every change in distance: the voice coach, "nice try" cards and the lock-screen countdown.
+    private func progressChanged(at time: Date) {
         if let event = niceTryDetector.check(gateTotals, at: time.timeIntervalSince1970) {
             niceTry = event
             logEvent("niceTry", detail: event.kind.rawValue)
@@ -395,6 +401,8 @@ final class RunTracker: NSObject, ObservableObject {
         if let cue = coach.cue(meters: live, target: runTargetKm * 1000, unlocked: countedTargetReached) {
             say(cue)
         }
+        liveActivity.update(meters: live, targetMeters: runTargetKm * 1000,
+                            unlocked: countedTargetReached, paused: status == .paused)
     }
 
     private func say(_ cue: VoiceCue) {
@@ -498,6 +506,7 @@ final class RunTracker: NSObject, ObservableObject {
             status = .tracking
         }
         startMotion(from: runStart)
+        liveActivity.reattach()
     }
 
     // MARK: - Stride model (treadmill mode)
