@@ -15,6 +15,8 @@
 		5D3E6F34F1E6F2C6E4466747 /* JogLockCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2B7D53B81DFFC597742A01E8 /* JogLockCore */; };
 		EE276C19B937F661A3F7BA6C /* JogLockShieldAction.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AD357D5E05FCC7BC1E703D06 /* JogLockShieldAction.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9E0AE3889590C96275BA91E0 /* JogLockCore in Frameworks */ = {isa = PBXBuildFile; productRef = 45AFA4F847E73A67FAD49DAD /* JogLockCore */; };
+		8B21DCE68EE68BFB34262409 /* JogLockReport.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = 50DB005AEC1FEB39CAD994C9 /* JogLockReport.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F9E4A697019404D8F0361ACC /* JogLockCore in Frameworks */ = {isa = PBXBuildFile; productRef = 799BDCAF1D511FCE8616286D /* JogLockCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -46,6 +48,13 @@
 			remoteGlobalIDString = FB4380A10661F6ED989E7F2A;
 			remoteInfo = JogLockShieldAction;
 		};
+		5247FC63D3A28E9E71F06CFE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A05B64375D8F49F0E0C03B4E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DF65B38450D51240EF67EB72;
+			remoteInfo = JogLockReport;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -63,6 +72,17 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0B1DE79E42337782D48705A9 /* Embed ExtensionKit Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(EXTENSIONS_FOLDER_PATH)";
+			dstSubfolderSpec = 16;
+			files = (
+				8B21DCE68EE68BFB34262409 /* JogLockReport.appex in Embed ExtensionKit Extensions */,
+			);
+			name = "Embed ExtensionKit Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -72,6 +92,7 @@
 		C3F5A215CDD0DE6B575F22DF /* JogLockMonitor.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = JogLockMonitor.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		33EEE7477A58830E5D5259C2 /* JogLockShield.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = JogLockShield.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AD357D5E05FCC7BC1E703D06 /* JogLockShieldAction.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = JogLockShieldAction.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		50DB005AEC1FEB39CAD994C9 /* JogLockReport.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = JogLockReport.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -108,6 +129,16 @@
 		5A3FD8A57E3AA5B2DA8DAF1A /* JogLockShieldAction */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = JogLockShieldAction;
+			sourceTree = "<group>";
+		};
+		0C3907F5F20568106DD3B3E5 /* ReportShared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ReportShared;
+			sourceTree = "<group>";
+		};
+		540657A8B035DEB344EEB956 /* JogLockReport */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = JogLockReport;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -152,6 +183,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D83E7067A653B16CBEDD6C62 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F9E4A697019404D8F0361ACC /* JogLockCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -167,6 +206,8 @@
 				2E3F60BC752B4A9EBC96D525 /* JogLockMonitor */,
 				E37F075FFE559F4FBBDA4E5E /* JogLockShield */,
 				5A3FD8A57E3AA5B2DA8DAF1A /* JogLockShieldAction */,
+				0C3907F5F20568106DD3B3E5 /* ReportShared */,
+				540657A8B035DEB344EEB956 /* JogLockReport */,
 			);
 			sourceTree = "<group>";
 		};
@@ -186,6 +227,7 @@
 				C3F5A215CDD0DE6B575F22DF /* JogLockMonitor.appex */,
 				33EEE7477A58830E5D5259C2 /* JogLockShield.appex */,
 				AD357D5E05FCC7BC1E703D06 /* JogLockShieldAction.appex */,
+				50DB005AEC1FEB39CAD994C9 /* JogLockReport.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -201,6 +243,7 @@
 				9838431F04AF1C0E074A59F1 /* Frameworks */,
 				0241B023E1739E743C9FD280 /* Resources */,
 				C4E0FF4A47288B9F63CD90C5 /* Embed Foundation Extensions */,
+				0B1DE79E42337782D48705A9 /* Embed ExtensionKit Extensions */,
 			);
 			buildRules = (
 			);
@@ -209,11 +252,13 @@
 				E91A75CEE4075DF12F535553 /* PBXTargetDependency */,
 				A153A72EE298B9A1ABFDB30E /* PBXTargetDependency */,
 				E27A7650D62D1417353B3F23 /* PBXTargetDependency */,
+				DAC0D9C6466B9A520DB6D008 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				5CB91A16ABE391777900CEA1 /* JogLockTracker */,
 				EB59B36D52FA0F588DDE0122 /* Shared */,
 				EEFCF30CFC820D0E9320C036 /* LockShared */,
+				0C3907F5F20568106DD3B3E5 /* ReportShared */,
 			);
 			name = JogLockTracker;
 			packageProductDependencies = (
@@ -318,6 +363,30 @@
 			productReference = AD357D5E05FCC7BC1E703D06 /* JogLockShieldAction.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		DF65B38450D51240EF67EB72 /* JogLockReport */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9017B18A685FEA7590FCDAB6 /* Build configuration list for PBXNativeTarget "JogLockReport" */;
+			buildPhases = (
+				E3FD1C1763BA4997F9445308 /* Sources */,
+				D83E7067A653B16CBEDD6C62 /* Frameworks */,
+				9F7C6A4E72B8C2591DD4A6BD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				540657A8B035DEB344EEB956 /* JogLockReport */,
+				0C3907F5F20568106DD3B3E5 /* ReportShared */,
+			);
+			name = JogLockReport;
+			packageProductDependencies = (
+				799BDCAF1D511FCE8616286D /* JogLockCore */,
+			);
+			productName = JogLockReport;
+			productReference = 50DB005AEC1FEB39CAD994C9 /* JogLockReport.appex */;
+			productType = "com.apple.product-type.extensionkit-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -328,6 +397,9 @@
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					DF65B38450D51240EF67EB72 = {
+						CreatedOnToolsVersion = 16.0;
+					};
 					FB4380A10661F6ED989E7F2A = {
 						CreatedOnToolsVersion = 16.0;
 					};
@@ -367,6 +439,7 @@
 				88DAA8BBB728A64FFF9E2AC5 /* JogLockMonitor */,
 				4D161990D1080727BFCDDB4D /* JogLockShield */,
 				FB4380A10661F6ED989E7F2A /* JogLockShieldAction */,
+				DF65B38450D51240EF67EB72 /* JogLockReport */,
 			);
 		};
 /* End PBXProject section */
@@ -401,6 +474,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		09375E9FBE5DE831B66A090B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9F7C6A4E72B8C2591DD4A6BD /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -445,6 +525,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E3FD1C1763BA4997F9445308 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -467,6 +554,11 @@
 			isa = PBXTargetDependency;
 			target = FB4380A10661F6ED989E7F2A /* JogLockShieldAction */;
 			targetProxy = 1FDE95BCF19444F698E78879 /* PBXContainerItemProxy */;
+		};
+		DAC0D9C6466B9A520DB6D008 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DF65B38450D51240EF67EB72 /* JogLockReport */;
+			targetProxy = 5247FC63D3A28E9E71F06CFE /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -822,6 +914,64 @@
 			};
 			name = Release;
 		};
+		6C1F31979CC979B292032F95 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/JogLockReport.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = F28RFTNGV7;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/JogLockReport-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = JogLockReport;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.abdullahaziz.JogLockTracker.Report;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		BD92519B8CC0B755359CF8C8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/JogLockReport.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = F28RFTNGV7;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/JogLockReport-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = JogLockReport;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.abdullahaziz.JogLockTracker.Report;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -879,6 +1029,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		9017B18A685FEA7590FCDAB6 /* Build configuration list for PBXNativeTarget "JogLockReport" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6C1F31979CC979B292032F95 /* Debug */,
+				BD92519B8CC0B755359CF8C8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -902,6 +1061,10 @@
 			productName = JogLockCore;
 		};
 		45AFA4F847E73A67FAD49DAD /* JogLockCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = JogLockCore;
+		};
+		799BDCAF1D511FCE8616286D /* JogLockCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = JogLockCore;
 		};

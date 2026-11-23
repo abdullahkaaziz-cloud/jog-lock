@@ -62,6 +62,10 @@ struct ContentView: View {
                         ShareRunButton(run: run)
                     }
 
+                    if !tracker.isActive && lock.isAuthorized {
+                        TimeOnAppsCard()
+                    }
+
                     if !tracker.isActive {
                         howToCard
                     }

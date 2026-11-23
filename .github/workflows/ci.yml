@@ -90,3 +90,14 @@ jobs:
           check JogLockMonitor com.apple.deviceactivity.monitor-extension JogLockMonitor.DeviceActivityMonitorExtension
           check JogLockShield com.apple.ManagedSettingsUI.shield-configuration-service JogLockShield.ShieldConfigurationExtension
           check JogLockShieldAction com.apple.ManagedSettings.shield-action-service JogLockShieldAction.ShieldActionExtension
+      # The time-on-apps report is an ExtensionKit extension: it lives in the
+      # app's Extensions folder, not PlugIns, and has no principal class.
+      - name: Check the report extension inside the app
+        run: |
+          plist=DerivedData/Build/Products/Debug-iphoneos/JogLockTracker.app/Extensions/JogLockReport.appex/Info.plist
+          test -f "$plist" || { echo "::error::JogLockReport.appex is missing from the app's Extensions folder"; exit 1; }
+          point=$(plutil -extract EXAppExtensionAttributes.EXExtensionPointIdentifier raw "$plist")
+          [ "$point" = com.apple.deviceactivityui.report-extension ] || { echo "::error::JogLockReport has extension point $point"; exit 1; }
+          type=$(plutil -extract CFBundlePackageType raw "$plist")
+          [ "$type" = 'XPC!' ] || { echo "::error::JogLockReport has package type $type, expected XPC!"; exit 1; }
+          echo "JogLockReport: $point $type"
