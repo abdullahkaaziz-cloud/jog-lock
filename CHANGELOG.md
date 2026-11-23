@@ -11,13 +11,16 @@ All notable changes to this project are listed here. The format follows [Keep a 
 - "Nice try" cards (shareable) when the step check throws out distance.
 - Story-sized share card for each run.
 - Lock-screen and Dynamic Island countdown during a run (Live Activity).
-- The app lock (Screen Time):
-  - Pick apps to lock; they stay locked each day until you've run the daily target.
-  - A shield on locked apps saying how far away they are ("TikTok is 1.8 km away").
+- The app lock (Screen Time), built on Tilawah Key's blocking:
+  - Pick apps to lock; they stay locked each day until you've run the daily target, then open until 4:00.
+  - A shield on locked apps saying how far away they are ("TikTok is 1.8 km away"), with a line that changes each minute. Run now opens Jog Lock (iOS 26.5+) or sends a notification that does.
   - An unlock celebration.
-  - Banked minutes (15 a kilometre past the target) to spend on another day.
+  - Banked minutes (15 a kilometre past the target, up to an hour), counted only while the locked apps are used, with a warning a minute before they run out.
   - Borrowing 30 minutes from tomorrow for 1 km more tomorrow.
-  - Rules in `LockLedger`, with tests; ADR-0005.
+  - While locked, apps can only be added and the lock can't be turned off.
+  - Websites are blocked in other browsers too (iOS's web filter).
+  - Shareable lock diagnostics in Settings.
+  - Rules in `LockLedger` and `LockState`, with tests; ADR-0005.
 - CI checks that each extension is built into the app with the right extension point and class.
 - The step check (anti-cheat): only GPS distance backed by steps, and not covered in a car or on a bike, counts toward unlocking. Run logs now include step and motion lines, and the stop event and run summary record what counted and what didn't.
 - Motion & Fitness permission, with a warning when it's off.

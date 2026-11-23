@@ -20,9 +20,7 @@ struct AppLockCard: View {
     var body: some View {
         Group {
             if lock.isEnabled && lock.hasChosenApps {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    lockContent(now: context.date)
-                }
+                lockContent
             } else {
                 setUpContent
             }
@@ -41,7 +39,7 @@ struct AppLockCard: View {
             Button("Borrow") { lock.borrow() }
             Button("Not now", role: .cancel) {}
         } message: {
-            Text("Your apps open now. Tomorrow's run goes up by \(Format.shortDistance(lock.rules.borrowMeters)).")
+            Text("Your apps open now, and every minute you use them counts. Tomorrow's run goes up by \(Format.shortDistance(lock.rules.borrowMeters)).")
         }
         .confirmationDialog("Turn off the app lock?", isPresented: $confirmOff, titleVisibility: .visible) {
             Button("Turn off", role: .destructive) { lock.turnOff() }
@@ -74,7 +72,7 @@ struct AppLockCard: View {
         VStack(alignment: .leading, spacing: 10) {
             Label("Lock your apps", systemImage: "lock.fill")
                 .font(.headline)
-            Text("Pick apps like TikTok or Instagram. Each day they stay locked until you've run \(Format.shortDistance(lock.rules.dailyMeters)).")
+            Text("Pick apps like TikTok or Instagram. Each day they stay locked until you've run \(Format.shortDistance(lock.rules.dailyMeters)). Once they're locked you can add apps, but removing them or turning the lock off waits until you've run.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Button {
@@ -89,28 +87,16 @@ struct AppLockCard: View {
 
     // MARK: - Lock on
 
-    private func lockContent(now: Date) -> some View {
+    private var lockContent: some View {
         let ledger = lock.ledger
-        let unlocked = ledger.isUnlocked(at: now)
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                status(ledger: ledger, now: now)
+                status(ledger)
                 Spacer()
-                Menu {
-                    Button {
-                        chooseApps()
-                    } label: {
-                        Label("Change apps", systemImage: "apps.iphone")
-                    }
-                    Button(role: .destructive) {
-                        confirmOff = true
-                    } label: {
-                        Label("Turn off app lock", systemImage: "lock.open")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.title3)
-                }
+                menu
+            }
+            if lock.accessOff {
+                accessOff
             }
             LockedAppsRow(selection: lock.selection)
             if ledger.owedMeters > 0 && !ledger.isTargetMet {
@@ -119,24 +105,21 @@ struct AppLockCard: View {
                     .foregroundStyle(.secondary)
             }
             Divider()
-            bank(ledger: ledger, unlocked: unlocked)
-            if !unlocked {
-                borrow(ledger: ledger, now: now)
-            }
+            minutes(ledger)
         }
     }
 
     @ViewBuilder
-    private func status(ledger: LockLedger, now: Date) -> some View {
+    private func status(_ ledger: LockLedger) -> some View {
         if ledger.isTargetMet {
-            Label("Unlocked for today", systemImage: "lock.open.fill")
+            let end = lock.rules.dayEnd(after: ledger.unlockedAt ?? Date())
+            Label("Unlocked until \(end.formatted(date: .omitted, time: .shortened))", systemImage: "lock.open.fill")
                 .font(.headline)
                 .foregroundStyle(.green)
-        } else if let session = ledger.activeSession(at: now) {
-            let kind = session.source == .borrow ? "borrowed" : "banked"
-            Label("Open for \(Format.duration(session.end.timeIntervalSince(now))) (\(kind))", systemImage: "lock.open.fill")
+        } else if ledger.spending {
+            Label(ledger.isOpen ? "Open · \(ledger.spendableMinutes) min left" : "Opening…",
+                  systemImage: ledger.isOpen ? "lock.open.fill" : "hourglass")
                 .font(.headline)
-                .monospacedDigit()
                 .foregroundStyle(.orange)
         } else {
             Label("Locked · \(Format.shortDistance(ledger.remainingMeters)) to go", systemImage: "lock.fill")
@@ -145,30 +128,72 @@ struct AppLockCard: View {
         }
     }
 
-    private func bank(ledger: LockLedger, unlocked: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("\(Int(ledger.bankMinutes)) banked minutes", systemImage: "hourglass")
+    private var menu: some View {
+        Menu {
+            Button {
+                chooseApps()
+            } label: {
+                Label(lock.isLocked ? "Add apps" : "Change apps", systemImage: "apps.iphone")
+            }
+            Button(role: .destructive) {
+                if lock.isLocked {
+                    lock.problem = "You can turn the lock off once today's run is done."
+                } else {
+                    confirmOff = true
+                }
+            } label: {
+                Label("Turn off app lock", systemImage: "lock.open")
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.title3)
+        }
+    }
+
+    private var accessOff: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Screen Time access is off", systemImage: "exclamationmark.triangle.fill")
                 .font(.subheadline.weight(.semibold))
-            Text("Every km past your target banks \(Int(lock.rules.minutesPerExtraKm)) minutes for another day.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if !unlocked {
-                HStack {
-                    ForEach([15, 30, 60], id: \.self) { minutes in
-                        Button("Use \(minutes) min") {
-                            lock.spend(minutes: Double(minutes))
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(ledger.bankMinutes + 1e-9 < Double(minutes))
+                .foregroundStyle(.orange)
+            Text("iOS can't lock your apps until it's back on.")
+                .font(.footnote)
+            Button("Turn it back on") {
+                Task {
+                    if await lock.authorize() {
+                        lock.refresh(after: "access back")
                     }
                 }
-                .font(.footnote)
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
+    @ViewBuilder
+    private func minutes(_ ledger: LockLedger) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("\(ledger.spendableMinutes) banked minutes", systemImage: "hourglass")
+                .font(.subheadline.weight(.semibold))
+            Text("Each km past your target banks \(Int(lock.rules.minutesPerExtraKm)) minutes. Spent, they only count while you're using the locked apps.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if ledger.spending {
+                Button("Lock again now") {
+                    lock.stopSpending()
+                }
+                .buttonStyle(.bordered)
+            } else if !ledger.isTargetMet {
+                Button("Use banked minutes") {
+                    lock.spend()
+                }
+                .buttonStyle(.bordered)
+                .disabled(ledger.spendableMinutes < 1)
+                borrow(ledger)
             }
         }
     }
 
-    private func borrow(ledger: LockLedger, now: Date) -> some View {
-        let problem = ledger.borrowProblem(rules: lock.rules, at: now)
+    private func borrow(_ ledger: LockLedger) -> some View {
+        let problem = ledger.borrowProblem(rules: lock.rules)
         return VStack(alignment: .leading, spacing: 6) {
             Button {
                 confirmBorrow = true

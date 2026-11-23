@@ -1,112 +1,113 @@
 //
 //  LockStore.swift
-//  Built into the app and its Screen Time extensions (monitor and shield).
+//  Built into the app and its Screen Time extensions.
 //
-//  The lock's state lives in the App Group so the extensions can read it:
-//  whether the lock is on, the chosen apps, the rules and today's ledger.
-//  LockShield makes iOS match it: the chosen apps are shielded unless
-//  today's run is done or an unlock session is on.
+//  Where the lock keeps things in the App Group, so the extensions can read
+//  them: the state (one JSON file, only ever replaced whole), the usage
+//  events waiting to be counted, and short logs of what each part did, for
+//  the diagnostics. The file lock that guards the state is in LockCycle.
+//
+//  The approach is Tilawah Key's, which settled on files over shared
+//  UserDefaults after many iPhone tests.
 //
 
-import FamilyControls
 import Foundation
 import JogLockCore
-import ManagedSettings
 
 enum LockStore {
     static let appGroup = "group.com.abdullahaziz.JogLockTracker"
 
-    private static var defaults: UserDefaults {
-        UserDefaults(suiteName: appGroup) ?? .standard
+    static var container: URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
     }
 
-    private enum Keys {
-        static let enabled = "lock.enabled"
-        static let selection = "lock.selection"
-        static let rules = "lock.rules"
-        static let ledger = "lock.ledger"
+    static func stateURL(in directory: URL) -> URL {
+        directory.appendingPathComponent("lock-state-v1.json")
     }
 
-    static var isEnabled: Bool {
-        get { defaults.bool(forKey: Keys.enabled) }
-        set { defaults.set(newValue, forKey: Keys.enabled) }
+    static func inbox(in directory: URL) -> UsageInbox {
+        UsageInbox(directory: directory.appendingPathComponent("usage-events"))
     }
 
-    /// The apps, categories and websites to lock.
-    static var selection: FamilyActivitySelection {
-        get { load(FamilyActivitySelection.self, key: Keys.selection) ?? FamilyActivitySelection() }
-        set { save(newValue, key: Keys.selection) }
+    /// The state as saved, read without the lock: for the shield and the
+    /// monitor's warning, which never save it. Never half-written, as the
+    /// file is only ever replaced whole. Nil if there's none or it can't be
+    /// trusted.
+    static func peek() -> LockState? {
+        guard let directory = container,
+              let data = try? Data(contentsOf: stateURL(in: directory)),
+              let state = try? JSONDecoder().decode(LockState.self, from: data), state.valid
+        else { return nil }
+        return state
     }
 
-    static var rules: LockRules {
-        get { load(LockRules.self, key: Keys.rules) ?? LockRules() }
-        set { save(newValue, key: Keys.rules) }
+    /// What the usage monitor did, newest last: iOS runs it where nothing else records it.
+    static var monitorLog: DiagnosticLog? {
+        container.map { DiagnosticLog(url: $0.appendingPathComponent("monitor-log.json"), limit: 60) }
     }
 
-    /// Today's ledger, brought up to `now` (a new day, a finished session).
-    /// The shield extension reads without saving.
-    static func ledger(at now: Date = Date(), saving: Bool = true) -> LockLedger {
-        let rules = self.rules
-        guard var ledger = load(LockLedger.self, key: Keys.ledger) else {
-            let fresh = LockLedger(day: LockDay(now), rules: rules)
-            if saving {
-                save(fresh, key: Keys.ledger)
-            }
-            return fresh
-        }
-        if ledger.update(to: now, rules: rules) && saving {
-            save(ledger, key: Keys.ledger)
-        }
-        return ledger
+    /// What the shield's buttons did.
+    static var shieldLog: DiagnosticLog? {
+        container.map { DiagnosticLog(url: $0.appendingPathComponent("shield-log.json"), limit: 30) }
     }
 
-    /// Changes today's ledger and saves it. Returns what `change` returns.
-    @discardableResult
-    static func changeLedger<T>(at now: Date = Date(), _ change: (inout LockLedger) throws -> T) rethrows -> T {
-        var ledger = self.ledger(at: now)
-        let result = try change(&ledger)
-        save(ledger, key: Keys.ledger)
-        return result
-    }
-
-    private static func load<T: Decodable>(_ type: T.Type, key: String) -> T? {
-        guard let data = defaults.data(forKey: key) else { return nil }
-        return try? JSONDecoder().decode(type, from: data)
-    }
-
-    private static func save<T: Encodable>(_ value: T, key: String) {
-        guard let data = try? JSONEncoder().encode(value) else { return }
-        defaults.set(data, forKey: key)
+    /// What the app asked of the lock, and how it went.
+    static var appLog: DiagnosticLog? {
+        container.map { DiagnosticLog(url: $0.appendingPathComponent("app-log.json"), limit: 100) }
     }
 }
 
-enum LockShield {
-    private static let store = ManagedSettingsStore(named: ManagedSettingsStore.Name("joglock"))
+/// A short JSON list in a file, newest last, at most `limit` entries.
+/// Diagnostics, not saved state: a list that can't be read starts again.
+struct DiagnosticLog {
+    let url: URL
+    let limit: Int
 
-    /// Shields or opens the chosen apps to match the lock at `now`. Safe to
-    /// call from anywhere, any number of times.
-    static func apply(at now: Date = Date()) {
-        let ledger = LockStore.ledger(at: now)
-        if LockStore.isEnabled && !ledger.isUnlocked(at: now) {
-            shield(LockStore.selection)
-        } else {
-            open()
+    func entries() -> [[String: Any]] {
+        guard let data = try? Data(contentsOf: url),
+              let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return [] }
+        return list
+    }
+
+    func append(_ entry: [String: Any]) {
+        guard JSONSerialization.isValidJSONObject(entry) else { return }
+        let list = Array((entries() + [entry]).suffix(limit))
+        guard let data = try? JSONSerialization.data(withJSONObject: list) else { return }
+        try? data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    }
+
+    /// The time for an entry.
+    static func now() -> String {
+        ISO8601DateFormatter().string(from: Date())
+    }
+}
+
+/// Usage events wait here, one empty file each, named by monitor and event,
+/// before the monitor asks for the lock. Every transaction counts what's
+/// waiting first, so a busy lock never loses an event; counting is
+/// idempotent, so one counted twice counts once.
+struct UsageInbox {
+    let directory: URL
+
+    func keep(monitor: String, event: String) throws {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data().write(to: directory.appendingPathComponent(monitor + "~" + event),
+                         options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    }
+
+    func kept() -> [(file: URL, monitor: String, event: String)] {
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        return files.compactMap { file in
+            let parts = file.lastPathComponent.split(separator: "~", maxSplits: 1).map(String.init)
+            guard parts.count == 2, !parts[0].hasPrefix(".") else { return nil }
+            return (file, parts[0], parts[1])
         }
     }
 
-    static func open() {
-        store.clearAllSettings()
-    }
-
-    private static func shield(_ selection: FamilyActivitySelection) {
-        let apps = selection.applicationTokens
-        let categories = selection.categoryTokens
-        let sites = selection.webDomainTokens
-        store.shield.applications = apps.isEmpty ? nil : apps
-        store.shield.applicationCategories = categories.isEmpty
-            ? nil : ShieldSettings.ActivityCategoryPolicy.specific(categories)
-        store.shield.webDomains = sites.isEmpty ? nil : sites
-        store.shield.webDomainCategories = categories.isEmpty
-            ? nil : ShieldSettings.ActivityCategoryPolicy.specific(categories)
+    func remove(_ files: [URL]) {
+        for file in files {
+            try? FileManager.default.removeItem(at: file)
+        }
     }
 }

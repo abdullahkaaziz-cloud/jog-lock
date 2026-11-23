@@ -94,9 +94,7 @@ struct ContentView: View {
                 }
             }
             .onChange(of: scenePhase, initial: true) { _, phase in
-                if phase == .active {
-                    lock.refresh()
-                }
+                lock.setActive(phase == .active)
             }
             .confirmationDialog("Stop this run?", isPresented: $confirmStop, titleVisibility: .visible) {
                 Button("Stop and save", role: .destructive) { tracker.stop() }

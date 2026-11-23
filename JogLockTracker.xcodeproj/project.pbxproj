@@ -14,6 +14,7 @@
 		A317757833F7ECC1BF5FA761 /* JogLockShield.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 33EEE7477A58830E5D5259C2 /* JogLockShield.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5D3E6F34F1E6F2C6E4466747 /* JogLockCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2B7D53B81DFFC597742A01E8 /* JogLockCore */; };
 		EE276C19B937F661A3F7BA6C /* JogLockShieldAction.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AD357D5E05FCC7BC1E703D06 /* JogLockShieldAction.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		9E0AE3889590C96275BA91E0 /* JogLockCore in Frameworks */ = {isa = PBXBuildFile; productRef = 45AFA4F847E73A67FAD49DAD /* JogLockCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -147,6 +148,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9E0AE3889590C96275BA91E0 /* JogLockCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -306,9 +308,11 @@
 			);
 			fileSystemSynchronizedGroups = (
 				5A3FD8A57E3AA5B2DA8DAF1A /* JogLockShieldAction */,
+				EEFCF30CFC820D0E9320C036 /* LockShared */,
 			);
 			name = JogLockShieldAction;
 			packageProductDependencies = (
+				45AFA4F847E73A67FAD49DAD /* JogLockCore */,
 			);
 			productName = JogLockShieldAction;
 			productReference = AD357D5E05FCC7BC1E703D06 /* JogLockShieldAction.appex */;
@@ -894,6 +898,10 @@
 			productName = JogLockCore;
 		};
 		2B7D53B81DFFC597742A01E8 /* JogLockCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = JogLockCore;
+		};
+		45AFA4F847E73A67FAD49DAD /* JogLockCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = JogLockCore;
 		};

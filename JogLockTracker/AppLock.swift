@@ -3,123 +3,297 @@
 //  JogLockTracker
 //
 //  The app's side of the lock: Screen Time permission, the chosen apps,
-//  and turning runs, banked minutes and borrowing into unlocks. The state
-//  itself lives in LockStore (shared with the extensions).
+//  and runs, banked minutes and borrowing turned into unlocks. The lock
+//  itself is LockCycle, shared with the extensions; here it runs on a
+//  background actor, so file locks and iOS's DeviceActivity calls never
+//  hold up the screen (as in Tilawah Key).
 //
 
 import FamilyControls
 import Foundation
 import JogLockCore
+import UIKit
+import UserNotifications
+
+private actor LockRuntime {
+    private let cycle = LockCycle()
+
+    enum Command {
+        case snapshot, refresh, turnOff, spend, stopSpending, borrow
+        case choose(Data)
+        case credit(String, Double, Date)
+        case dailyMeters(Double)
+
+        var name: String {
+            switch self {
+            case .snapshot: "snapshot"
+            case .refresh: "refresh"
+            case .turnOff: "turn off"
+            case .spend: "use minutes"
+            case .stopSpending: "lock again"
+            case .borrow: "borrow"
+            case .choose: "choose apps"
+            case .credit: "credit run"
+            case .dailyMeters: "daily target"
+            }
+        }
+
+        /// Errors from what the runner asked for are shown; the rest (catching
+        /// up, crediting runs) only go to the diagnostics.
+        var showsErrors: Bool {
+            switch self {
+            case .turnOff, .spend, .stopSpending, .borrow, .choose: true
+            case .snapshot, .refresh, .credit, .dailyMeters: false
+            }
+        }
+    }
+
+    struct Outcome {
+        var state: LockState?
+        var unlocked = false
+        var note: String?
+        var error: String?
+    }
+
+    func run(_ command: Command) -> Outcome {
+        var outcome = Outcome()
+        do {
+            switch command {
+            case .snapshot:
+                break
+            case .refresh:
+                outcome.note = try cycle.refresh()
+            case .turnOff:
+                try cycle.turnOff()
+            case .spend:
+                try cycle.spend()
+            case .stopSpending:
+                try cycle.stopSpending()
+            case .borrow:
+                try cycle.borrow()
+            case .choose(let selection):
+                try cycle.choose(selection)
+            case .credit(let id, let meters, let time):
+                outcome.unlocked = try cycle.credit(run: id, countedMeters: meters, at: time)
+            case .dailyMeters(let meters):
+                try cycle.setDailyMeters(meters)
+            }
+        } catch let error as LockError {
+            outcome.error = AppLock.message(for: error)
+        } catch {
+            outcome.error = error.localizedDescription
+        }
+        outcome.state = try? cycle.snapshot()
+        return outcome
+    }
+}
 
 @MainActor
 final class AppLock: ObservableObject {
     static let shared = AppLock()
 
-    @Published private(set) var isEnabled: Bool
-    @Published private(set) var selection: FamilyActivitySelection
-    @Published private(set) var rules: LockRules
-    @Published private(set) var ledger: LockLedger
+    /// The lock as last read. The runtime's copy is the real one.
+    @Published private(set) var state: LockState
+    @Published private(set) var selection = FamilyActivitySelection()
+    @Published private(set) var authorization: AuthorizationStatus
     /// True when a run has just opened the apps: shows the unlock celebration.
     @Published var celebrating = false
     @Published var problem: String?
 
-    /// Run distance last saved to the shared ledger, by run.
+    private let runtime = LockRuntime()
+    /// Run distance last saved to the lock, by run.
     private var savedMeters: [String: Double] = [:]
+    private var undeterminedSince: Date?
+    private var active = false
+    private var nextCheck: Task<Void, Never>?
+    private var observer: NSObjectProtocol?
 
     private init() {
-        isEnabled = LockStore.isEnabled
-        selection = LockStore.selection
-        rules = LockStore.rules
-        ledger = LockStore.ledger()
+        state = LockStore.peek() ?? LockState(now: Date())
+        authorization = AuthorizationCenter.shared.authorizationStatus
+        if let data = state.selection, let decoded = try? LockShield.decode(data) {
+            selection = decoded
+        }
+        LockSignal.listen()
+        observer = NotificationCenter.default.addObserver(forName: LockSignal.received, object: nil,
+                                                          queue: .main) { _ in
+            Task { @MainActor in AppLock.shared.refresh(after: "monitor") }
+        }
     }
+
+    var isEnabled: Bool { state.enabled }
+    var ledger: LockLedger { state.ledger }
+    var rules: LockRules { state.rules }
 
     var hasChosenApps: Bool {
         !selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty || !selection.webDomainTokens.isEmpty
     }
 
     var isAuthorized: Bool {
-        AuthorizationCenter.shared.authorizationStatus == .approved
+        authorization == .approved
+    }
+
+    /// Screen Time access looks off: refused, or "not determined" for over
+    /// 5 s with the lock on (iOS says that for a moment at launch).
+    var accessOff: Bool {
+        guard state.enabled else { return false }
+        if authorization == .denied {
+            return true
+        }
+        if authorization == .notDetermined, let since = undeterminedSince {
+            return Date().timeIntervalSince(since) >= 5
+        }
+        return false
+    }
+
+    /// The apps are locked until today's run. Meanwhile apps can only be
+    /// added, and the lock can't be turned off.
+    var isLocked: Bool {
+        state.enabled && !state.ledger.isTargetMet && !accessOff
+    }
+
+    // MARK: - Keeping up
+
+    /// Catches up with the lock: at launch, when the app comes to the front,
+    /// when the monitor signals, when an open monitor's time comes, and every
+    /// minute while the app is open.
+    func refresh(after trigger: String) {
+        Task { await perform(.refresh, trigger: trigger) }
+    }
+
+    func setActive(_ isActive: Bool) {
+        active = isActive
+        if isActive {
+            refresh(after: "app opened")
+        } else {
+            nextCheck?.cancel()
+        }
+    }
+
+    private func perform(_ command: LockRuntime.Command, trigger: String) async {
+        let status = AuthorizationCenter.shared.authorizationStatus
+        authorization = status
+        undeterminedSince = status == .notDetermined ? (undeterminedSince ?? Date()) : nil
+        var command = command
+        if case .refresh = command, state.enabled, status != .approved {
+            command = .snapshot     // iOS won't take changes without access
+        }
+        let outcome = await runtime.run(command)
+        if let new = outcome.state {
+            state = new
+            if let data = new.selection, let decoded = try? LockShield.decode(data) {
+                selection = decoded
+            }
+        }
+        if let error = outcome.error, command.showsErrors {
+            problem = error
+        }
+        if outcome.unlocked && state.enabled {
+            celebrating = true
+        }
+        log(command, trigger: trigger, outcome: outcome)
+        scheduleNextCheck()
+    }
+
+    private func scheduleNextCheck() {
+        nextCheck?.cancel()
+        guard active else { return }
+        let now = Date()
+        var wait: TimeInterval = 60
+        if let end = state.ledger.monitor?.end, end > now {
+            wait = min(wait, end.timeIntervalSince(now) + 0.5)
+        }
+        nextCheck = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(max(1, wait) * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            self?.refresh(after: "timer")
+        }
+    }
+
+    /// Kept for the diagnostics: everything but plain refreshes that changed nothing.
+    private func log(_ command: LockRuntime.Command, trigger: String, outcome: LockRuntime.Outcome) {
+        if case .refresh = command, outcome.note == nil, outcome.error == nil {
+            return
+        }
+        if case .snapshot = command, outcome.error == nil {
+            return
+        }
+        var entry: [String: Any] = [
+            "time": DiagnosticLog.now(), "command": command.name, "trigger": trigger,
+            "authorization": "\(authorization)",
+        ]
+        if let note = outcome.note {
+            entry["note"] = note
+        }
+        if let error = outcome.error {
+            entry["error"] = error
+        }
+        if outcome.unlocked {
+            entry["unlocked"] = true
+        }
+        if let state = outcome.state {
+            entry.merge(LockCycle.summary(state)) { mine, _ in mine }
+        }
+        LockStore.appLog?.append(entry)
     }
 
     // MARK: - Turning it on and off
 
-    /// Asks for Screen Time access (Face ID or passcode). True if granted.
+    /// Asks for Screen Time access (Face ID or passcode), and notifications
+    /// for Run now and the 1-minute warning. True if Screen Time is allowed.
     func authorize() async -> Bool {
-        if isAuthorized {
-            return true
+        if !isAuthorized {
+            do {
+                try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
+            } catch {
+                problem = "Jog Lock needs Screen Time access to lock apps. \(error.localizedDescription)"
+            }
+            authorization = AuthorizationCenter.shared.authorizationStatus
         }
-        do {
-            try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
-        } catch {
-            problem = "Jog Lock needs Screen Time access to lock apps. \(error.localizedDescription)"
-        }
+        _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
         return isAuthorized
     }
 
-    /// Saves the apps picked in the Screen Time picker; turns the lock on
-    /// if there are any, off if there are none.
+    /// The apps picked in Screen Time's picker: turns the lock on, or
+    /// changes its apps. While they're locked, apps can only be added.
     func choose(_ newSelection: FamilyActivitySelection) {
-        selection = newSelection
-        LockStore.selection = newSelection
-        if hasChosenApps {
-            turnOn()
-        } else if isEnabled {
-            turnOff()
-        }
-    }
-
-    private func turnOn() {
-        do {
-            try LockSchedule.startDaily()
-        } catch {
-            problem = "Couldn't set up the midnight lock: \(error.localizedDescription)"
+        if let reason = LockShield.problem(with: newSelection) {
+            if hasChosenApps {
+                problem = reason
+            }
             return
         }
-        if !isEnabled {
-            // Today's runs so far count against today's target.
-            let now = Date()
-            let rules = LockStore.rules
-            LockStore.changeLedger(at: now) { $0.resetTarget(rules: rules, at: now) }
+        if isLocked && !Self.adds(newSelection, to: selection) {
+            problem = "While your apps are locked you can only add to them. Run today's distance, then you can remove some."
+            return
         }
-        isEnabled = true
-        LockStore.isEnabled = true
-        refresh()
+        guard let data = try? LockShield.encode(newSelection) else {
+            problem = "Couldn't save the apps you chose."
+            return
+        }
+        selection = newSelection
+        Task { await perform(.choose(data), trigger: "apps chosen") }
+    }
+
+    /// Whether `new` keeps everything in `old`.
+    static func adds(_ new: FamilyActivitySelection, to old: FamilyActivitySelection) -> Bool {
+        new.applicationTokens.isSuperset(of: old.applicationTokens)
+            && new.categoryTokens.isSuperset(of: old.categoryTokens)
+            && new.webDomainTokens.isSuperset(of: old.webDomainTokens)
     }
 
     func turnOff() {
-        isEnabled = false
-        LockStore.isEnabled = false
-        LockSchedule.stopAll()
-        LockShield.open()
-        refresh()
-    }
-
-    /// Catches up: a new day, a finished session, the shield. Called when
-    /// the app comes to the front.
-    func refresh(at now: Date = Date()) {
-        rules = LockStore.rules
-        ledger = LockStore.ledger(at: now)
-        if isEnabled {
-            try? LockSchedule.startDaily()
-            LockShield.apply(at: now)
+        guard !isLocked else {
+            problem = "You can turn the lock off once today's run is done."
+            return
         }
+        Task { await perform(.turnOff, trigger: "turned off") }
     }
 
     /// The daily distance setting. While the lock is on, today's target
     /// stays and the new one starts tomorrow.
     func setDailyKm(_ km: Double) {
-        var rules = LockStore.rules
-        guard rules.dailyMeters != km * 1_000 else { return }
-        rules.dailyMeters = km * 1_000
-        LockStore.rules = rules
-        self.rules = rules
-        if !isEnabled {
-            let now = Date()
-            ledger = LockStore.changeLedger(at: now) { ledger in
-                ledger.resetTarget(rules: rules, at: now)
-                return ledger
-            }
-        }
+        Task { await perform(.dailyMeters(km * 1_000), trigger: "daily target") }
     }
 
     // MARK: - Runs
@@ -127,78 +301,75 @@ final class AppLock: ObservableObject {
     /// What the next run has to cover: what's left of today's target while
     /// the apps are locked, otherwise the usual setting.
     func runTargetKm(default km: Double) -> Double {
-        refresh()
-        guard isEnabled, !ledger.isTargetMet, ledger.remainingMeters > 0 else { return km }
+        var ledger = state.ledger
+        ledger.update(to: Date(), rules: state.rules)
+        guard state.enabled, !ledger.isTargetMet, ledger.remainingMeters > 0 else { return km }
         return ledger.remainingMeters / 1_000
     }
 
-    /// A run's counted distance so far. Saved to the shared ledger every
-    /// 25 m, at the unlock and at the end, so the shield's "1.8 km away"
-    /// stays close.
+    /// A run's counted distance so far. Saved to the lock every 25 m, at the
+    /// unlock and at the end, so the shield's "1.8 km away" stays close.
     func credit(run id: String, countedMeters: Double, at now: Date = Date(), finished: Bool = false) {
-        var preview = ledger
-        preview.update(to: now, rules: rules)
-        let unlocks = preview.credit(run: id, countedMeters: countedMeters, rules: rules, at: now)
+        var preview = state.ledger
+        preview.update(to: now, rules: state.rules)
+        let unlocks = preview.credit(run: id, countedMeters: countedMeters, rules: state.rules, at: now)
         if unlocks || finished || countedMeters - (savedMeters[id] ?? 0) >= 25 {
-            savedMeters[id] = countedMeters
-            let rules = self.rules
-            ledger = LockStore.changeLedger(at: now) { ledger in
-                ledger.credit(run: id, countedMeters: countedMeters, rules: rules, at: now)
-                return ledger
-            }
-        } else if preview != ledger {
-            ledger = preview
-        }
-        if finished {
-            savedMeters[id] = nil
-        }
-        if unlocks && isEnabled {
-            LockShield.apply(at: now)
-            celebrating = true
+            savedMeters[id] = finished ? nil : countedMeters
+            Task { await perform(.credit(id, countedMeters, now), trigger: finished ? "run finished" : "run") }
+        } else if preview != state.ledger {
+            state.ledger = preview      // shown now, saved with the next credit
         }
     }
 
     // MARK: - Banked minutes and borrowing
 
-    func spend(minutes: Double) {
-        startSession { ledger, now in try ledger.spend(minutes: minutes, at: now) }
+    func spend() {
+        Task { await perform(.spend, trigger: "use minutes") }
+    }
+
+    func stopSpending() {
+        Task { await perform(.stopSpending, trigger: "lock again") }
     }
 
     func borrow() {
-        let rules = self.rules
-        startSession { ledger, now in try ledger.borrow(rules: rules, at: now) }
-    }
-
-    private func startSession(_ make: (inout LockLedger, Date) throws -> UnlockSession) {
-        let now = Date()
-        do {
-            let session = try LockStore.changeLedger(at: now) { try make(&$0, now) }
-            do {
-                try LockSchedule.start(session)
-            } catch {
-                LockStore.changeLedger(at: now) { $0.cancel(session) }
-                problem = "iOS wouldn't time the unlock, so it's been cancelled. \(error.localizedDescription)"
-            }
-        } catch let error as LockError {
-            problem = Self.message(for: error)
-        } catch {
-            problem = error.localizedDescription
-        }
-        refresh(at: now)
+        Task { await perform(.borrow, trigger: "borrow") }
     }
 
     nonisolated static func message(for error: LockError) -> String {
         switch error {
         case .alreadyUnlocked:
-            "Your apps are already open."
-        case .tooShort:
-            "Unlocks are at least 15 minutes. iOS can't time anything shorter."
-        case .notEnoughMinutes(let available):
-            "You've only got \(Int(available)) banked minutes."
+            "Your apps are already open for today."
+        case .noMinutes:
+            "No banked minutes yet. Each km past your daily target banks 15."
+        case .stillHaveMinutes(let minutes):
+            "Use your \(minutes) banked minutes first."
         case .alreadyBorrowedToday:
             "You've already borrowed from tomorrow today."
         case .owedLimit(let owed):
             "You already owe \(Format.shortDistance(owed)). Run that off before borrowing more."
+        }
+    }
+
+    // MARK: - Diagnostics
+
+    /// A file to share when something goes wrong: the lock's state (counts
+    /// only, never which apps) and what the app, the monitor and the shield
+    /// did. Nothing about routes or places.
+    func diagnosticsFile() -> URL? {
+        let report: [String: Any] = [
+            "made": DiagnosticLog.now(), "app": RunTracker.appVersion, "ios": UIDevice.current.systemVersion,
+            "authorization": "\(authorization)", "state": LockCycle.summary(state),
+            "app_log": LockStore.appLog?.entries() ?? [], "monitor_log": LockStore.monitorLog?.entries() ?? [],
+            "shield_log": LockStore.shieldLog?.entries() ?? [],
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+        else { return nil }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("jog-lock-diagnostics.json")
+        do {
+            try data.write(to: url, options: .atomic)
+            return url
+        } catch {
+            return nil
         }
     }
 }
