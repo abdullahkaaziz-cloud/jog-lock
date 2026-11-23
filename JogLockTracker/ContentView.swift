@@ -38,6 +38,9 @@ struct ContentView: View {
                     if !tracker.isActive {
                         AppLockCard()
                     }
+                    if !tracker.isActive || lock.hasRunOnly {
+                        RunOnlyCard()
+                    }
 
                     statsRow
                     if tracker.isActive && tracker.runMode == .outdoor {

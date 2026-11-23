@@ -6,6 +6,7 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ### Added
 
+- Run-only apps: a second set of apps, locked except while a run is going (their own shield store, with a monitor that locks them four hours on at the latest).
 - Plans for the lock: daily, weekly (running ahead earns days off) or a nine-week 5K plan with the voice coach calling the run and walk intervals; rest days in any plan. Rules in `RunPlan`, with tests.
 - Route maps: live during a run, on each run's details, and all runs together.
 - A voice coach with funny lines every 500 m, at halfway, near the end and at the unlock, in a choice of voices. Settings for the voice and the app you're running for.

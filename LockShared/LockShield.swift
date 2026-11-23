@@ -49,6 +49,7 @@ enum LockShield {
     /// Shields the apps or lifts the shield, as the state says. If the
     /// chosen apps can't be read, the shield is left as it is.
     static func apply(_ state: LockState) throws {
+        applyRunOnly(state)
         guard state.shields else {
             open()
             return
@@ -98,5 +99,45 @@ enum LockFailure: LocalizedError {
         case .busy:
             "The lock is busy with another change. Try again in a moment."
         }
+    }
+}
+
+// MARK: - Run-only apps
+
+extension LockShield {
+    /// Run-only apps have their own store, so opening them for a run leaves
+    /// the daily lock alone. iOS shields an app if any store does.
+    private static let runStore = ManagedSettingsStore(named: ManagedSettingsStore.Name("joglock-run"))
+
+    /// Shields the run-only apps unless a run has them open.
+    static func applyRunOnly(_ state: LockState, at now: Date = Date()) {
+        guard let data = state.runOnly, let selection = try? decode(data), !state.runOnlyOpen(at: now) else {
+            runStore.clearAllSettings()
+            return
+        }
+        runStore.shield.applications = selection.applicationTokens.isEmpty ? nil : selection.applicationTokens
+        runStore.shield.applicationCategories = selection.categoryTokens.isEmpty
+            ? nil : .specific(selection.categoryTokens)
+        runStore.shield.webDomains = selection.webDomainTokens.isEmpty ? nil : selection.webDomainTokens
+    }
+
+    /// Whether the shield on this app, category or website is the run-only one rather than the daily lock's.
+    static func isRunOnly(_ state: LockState, application: ApplicationToken? = nil,
+                          category: ActivityCategoryToken? = nil, website: WebDomainToken? = nil) -> Bool {
+        guard let data = state.runOnly, let runOnly = try? decode(data) else { return false }
+        let locked = state.selection.flatMap { try? decode($0) }
+        if let application {
+            if locked?.applicationTokens.contains(application) == true && state.shields { return false }
+            if runOnly.applicationTokens.contains(application) { return true }
+        }
+        if let category {
+            if locked?.categoryTokens.contains(category) == true && state.shields { return false }
+            if runOnly.categoryTokens.contains(category) { return true }
+        }
+        if let website {
+            if locked?.webDomainTokens.contains(website) == true && state.shields { return false }
+            if runOnly.webDomainTokens.contains(website) { return true }
+        }
+        return false
     }
 }

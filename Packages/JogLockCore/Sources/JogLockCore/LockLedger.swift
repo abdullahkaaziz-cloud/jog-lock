@@ -534,6 +534,11 @@ public struct LockState: Codable, Equatable, Sendable {
     /// Websites typed in by name (`TypedWebsite.domain`), locked with the
     /// chosen apps by iOS's web filter.
     public var websites: [String] = []
+    /// Apps that open only while a run is going (Screen Time's selection,
+    /// like `selection`). Nil: none chosen.
+    public var runOnly: Data?
+    /// The run that has the run-only apps open, and until when at most.
+    public var runOpen: RunWindow?
     public var rules: LockRules
     public var ledger: LockLedger
 
@@ -543,7 +548,7 @@ public struct LockState: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case schema, enabled, selection, websites, rules, ledger
+        case schema, enabled, selection, websites, runOnly, runOpen, rules, ledger
     }
 
     /// A state saved before typed websites reads with none.
@@ -553,6 +558,8 @@ public struct LockState: Codable, Equatable, Sendable {
         enabled = try container.decode(Bool.self, forKey: .enabled)
         selection = try container.decodeIfPresent(Data.self, forKey: .selection)
         websites = try container.decodeIfPresent([String].self, forKey: .websites) ?? []
+        runOnly = try container.decodeIfPresent(Data.self, forKey: .runOnly)
+        runOpen = try container.decodeIfPresent(RunWindow.self, forKey: .runOpen)
         rules = try container.decode(LockRules.self, forKey: .rules)
         ledger = try container.decode(LockLedger.self, forKey: .ledger)
     }
@@ -615,10 +622,76 @@ public enum ShieldText {
         return "\(name) is \(Format.shortDistance(remainingMeters)) away"
     }
 
+    /// A run-only app: "Spotify is for runs".
+    public static func runOnlyTitle(app: String?) -> String {
+        let name = app.flatMap { $0.isEmpty ? nil : $0 } ?? "This app"
+        return "\(name) is for runs"
+    }
+
+    public static let runOnlySubtitle = "Start a run in Jog Lock and it opens until you stop."
+
     public static func subtitle(_ ledger: LockLedger, at date: Date) -> String {
         let minutes = ledger.spendableMinutes
         guard minutes > 0 else { return line(at: date) }
         let unit = minutes == 1 ? "minute" : "minutes"
         return line(at: date) + "\n\nOr use your \(minutes) banked \(unit) in Jog Lock."
+    }
+}
+
+// MARK: - Run-only apps
+
+/// A run that has the run-only apps open: they lock again when it ends, or
+/// at `until` if the app isn't there to see it end.
+public struct RunWindow: Codable, Equatable, Sendable {
+    public var run: String
+    /// The monitor that locks them at `until`.
+    public var monitor: String
+    public var until: Date
+
+    public init(run: String, monitor: String, until: Date) {
+        self.run = run
+        self.monitor = monitor
+        self.until = until
+    }
+}
+
+extension LockState {
+    /// The longest a run keeps the run-only apps open.
+    public static let longestRun: TimeInterval = 4 * 60 * 60
+
+    /// The run-only apps should be open now.
+    public func runOnlyOpen(at now: Date) -> Bool {
+        guard runOnly != nil, let window = runOpen else { return false }
+        return now < window.until
+    }
+
+    /// Ends a run's window that has run out. True if it did.
+    @discardableResult
+    public mutating func expireRunWindow(at now: Date) -> Bool {
+        guard let window = runOpen, now >= window.until else { return false }
+        runOpen = nil
+        return true
+    }
+
+    /// Opens the run-only apps for `run`. The window replaced, if any.
+    public mutating func openRunOnly(run: String, monitor: String, at now: Date) -> RunWindow? {
+        let replaced = runOpen
+        runOpen = RunWindow(run: run, monitor: monitor, until: now.addingTimeInterval(Self.longestRun))
+        return replaced
+    }
+
+    /// Locks the run-only apps when `run` ends (nil: whichever run). The
+    /// window closed, if any.
+    public mutating func closeRunOnly(run: String?) -> RunWindow? {
+        guard let window = runOpen, run == nil || window.run == run else { return nil }
+        runOpen = nil
+        return window
+    }
+
+    /// A run-only monitor ended: the window it guarded closes. True if it was current.
+    public mutating func runMonitorEnded(_ name: String) -> Bool {
+        guard runOpen?.monitor == name else { return false }
+        runOpen = nil
+        return true
     }
 }

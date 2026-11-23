@@ -107,6 +107,9 @@ final class RunTracker: NSObject, ObservableObject {
         manager.delegate = self
         observeAppState()
         resumeIfNeeded()
+        if runID == nil {
+            AppLock.shared.runEnded(nil)    // run-only apps left open by a run that's gone
+        }
         loadStrideModel()
     }
 
@@ -128,6 +131,7 @@ final class RunTracker: NSObject, ObservableObject {
         guard !isStopping else { return }
         isStopping = true
         stopIntervals()
+        AppLock.shared.runEnded(id)
         updatesTask?.cancel()
         updatesTask = nil
         endSessions()
@@ -279,6 +283,7 @@ final class RunTracker: NSObject, ObservableObject {
         startMotion(from: now)
         liveActivity.start(app: AppSettings.shared.nemesis, startedAt: now, targetMeters: runTargetKm * 1000)
         startIntervals(at: now)
+        AppLock.shared.runStarted(id)
     }
 
     // MARK: - 5K plan intervals

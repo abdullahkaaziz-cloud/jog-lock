@@ -44,6 +44,7 @@ Tap **Choose apps to lock** on the home screen. iOS asks for Screen Time access 
   - **Weekly:** a week's distance shared over your run days. Run more one day and the next days need less; finish the week and the rest of it is open. A missed day isn't added to the next, and minutes bank only past the week's distance.
   - **5K plan:** nine weeks of three runs, from 1 km of running and walking to 5 km without stopping. Each run starts with a 3-minute walk, and the voice coach calls every run and walk.
   - **Rest days** in any plan are open all day. Distance owed from borrowing waits for the next run day. Like the target, a change starts tomorrow while the lock is on.
+- **Run-only apps.** Pick a podcast, music or audiobook app on the Run-only apps card. It stays locked except while a run is going: it opens when you start and locks again when you stop, or four hours on if Jog Lock isn't running by then. Its shield says "Spotify is for runs". You can change these apps any time; they're a treat for running, not the lock.
 - **Websites typed in by name.** For websites the picker doesn't list: ⋯ → **Websites**, then type `instagram.com` (or paste a whole address). They're blocked in Safari and other browsers, subdomains too, with iOS's own "Restricted" page. Up to 40 websites in all, chosen and typed; while locked they can only be added.
 - **Time on apps.** Once Screen Time is connected, a card at the bottom of the home screen shows a day on average this week against last week, what this week's time would take to run for (15 minutes a km), and the five apps used most. With the lock on it covers the locked apps; otherwise every app. A separate extension draws it, and iOS keeps the numbers inside that extension: Jog Lock never sees them.
 - **Diagnostics.** If something looks wrong, Settings → App lock → **Share lock diagnostics**. It shows what the lock did and when, never which apps you chose.
@@ -162,6 +163,7 @@ These numbers come from a made-up noise model, so your jog decides which method 
   - iOS can report a minute of use, or the end of the day's unlock, a little late; sometimes not until a locked app is next opened.
   - While a website is blocked, Safari's private browsing is off (that's iOS's web filter, which also blocks it in Chrome).
   - iOS can't count time on websites typed in by name. While banked minutes are being spent they're open with the apps and don't use minutes up, and the Time on apps card leaves them out.
+  - Locking a run-only app doesn't stop sound it's already playing: an episode started on a run can finish.
   - The Time on apps card is blank while iOS draws it, and comes from Screen Time's own numbers, which can lag a little.
   - Turning off Screen Time access for Jog Lock in Settings switches the lock off, unless a Screen Time passcode protects it.
 - **Force-quit:** swiping the app away stops tracking. If iOS ends the app itself, it relaunches and resumes the run on its own (the blue location pill stays on).
@@ -205,6 +207,7 @@ JogLockTracker/             the iPhone app
   AppLock.swift             the app lock: Screen Time access, picked apps, unlocks
   AppLockCard.swift         the lock on the home screen
   PlanCard.swift            the plan: daily, weekly or the 5K plan, and rest days
+  RunOnlyCard.swift         apps that open only while you run
   WebsitesView.swift        websites typed in by name
   TimeOnAppsCard.swift      the Time on apps card (the report extension draws its numbers)
   UnlockCelebration.swift   the unlock moment

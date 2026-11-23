@@ -23,6 +23,9 @@ import JogLockCore
 
 final class LockCycle {
     static let prefix = "joglock-"
+    /// Run-only apps' monitors: a different prefix, so the daily lock's
+    /// clean-ups leave them alone.
+    static let runPrefix = "joglockrun-"
     private let center = DeviceActivityCenter()
     private let calendar = Calendar.current
 
@@ -68,6 +71,7 @@ final class LockCycle {
             state.ledger.count(monitor: item.monitor, event: item.event)
         }
         state.ledger.update(to: Date(), rules: state.rules, calendar: calendar)
+        state.expireRunWindow(at: Date())
         if state != saved {
             try save(state, to: url)
             try LockShield.apply(state)
@@ -152,6 +156,7 @@ final class LockCycle {
             try transaction { current in
                 if !current.enabled {
                     LockShield.open()
+                    LockShield.applyRunOnly(current)
                 }
             }
             stopMonitors()
@@ -216,6 +221,9 @@ final class LockCycle {
     /// timing them; the app renews when it next refreshes.
     @discardableResult
     func intervalEnded(monitor name: String) throws -> String {
+        if name.hasPrefix(Self.runPrefix) {
+            return try runMonitorEnded(name)
+        }
         let end: LockLedger.MonitorEnd
         do {
             end = try transaction { state in
@@ -356,6 +364,65 @@ final class LockCycle {
         }
     }
 
+    // MARK: - Run-only apps
+
+    /// Run-only apps chosen (nil: none).
+    func chooseRunOnly(_ selection: Data?) throws {
+        try transaction { state in
+            state.runOnly = selection
+            try LockShield.apply(state)
+        }
+    }
+
+    /// A run started: the run-only apps open until it ends. A monitor locks
+    /// them again four hours on, in case the app isn't running by then.
+    func runStarted(_ run: String) throws -> String {
+        let now = Date()
+        let name = Self.runPrefix + UUID().uuidString
+        let opened: (open: Bool, replaced: String?) = try transaction { state in
+            guard state.runOnly != nil else { return (false, nil) }
+            let replaced = state.openRunOnly(run: run, monitor: name, at: now)
+            try LockShield.apply(state)
+            return (true, replaced?.monitor)
+        }
+        if let replaced = opened.replaced {
+            center.stopMonitoring([DeviceActivityName(replaced)])
+        }
+        guard opened.open else { return "no run-only apps" }
+        let fields: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
+        let schedule = DeviceActivitySchedule(
+            intervalStart: calendar.dateComponents(fields, from: now),
+            intervalEnd: calendar.dateComponents(fields, from: now.addingTimeInterval(LockState.longestRun)),
+            repeats: false)
+        do {
+            try center.startMonitoring(DeviceActivityName(name), during: schedule)
+            return "run-only apps open"
+        } catch {
+            return "run-only apps open; their monitor failed: \(error.localizedDescription)"
+        }
+    }
+
+    /// A run ended (`run` nil: no run is going): the run-only apps lock.
+    func runEnded(_ run: String?) throws {
+        let closed: String? = try transaction { state in
+            guard let window = state.closeRunOnly(run: run) else { return nil }
+            try LockShield.apply(state)
+            return window.monitor
+        }
+        if let closed {
+            center.stopMonitoring([DeviceActivityName(closed)])
+        }
+    }
+
+    /// A run-only monitor ended: its run has had four hours.
+    private func runMonitorEnded(_ name: String) throws -> String {
+        try transaction { state in
+            guard state.runMonitorEnded(name) else { return "old run monitor" }
+            try LockShield.apply(state)
+            return "run-only apps locked"
+        }
+    }
+
     // MARK: - Diagnostics
 
     /// The state for the logs: counts only, never which apps.
@@ -366,7 +433,7 @@ final class LockCycle {
             "target_m": Int(ledger.targetMeters), "ran_m": Int(ledger.ranMeters), "owed_m": Int(ledger.owedMeters),
             "bank_min": ledger.bankMinutes, "spending": ledger.spending, "target_met": ledger.isTargetMet,
             "open": ledger.isOpen, "plan": state.rules.runPlan.kind.rawValue, "rest_day": ledger.isRestDay,
-            "week_m": Int(ledger.weekMeters),
+            "week_m": Int(ledger.weekMeters), "run_only": state.runOnly != nil, "run_open": state.runOpen != nil,
         ]
         if let monitor = ledger.monitor {
             entry["monitor"] = String(monitor.name.suffix(8))

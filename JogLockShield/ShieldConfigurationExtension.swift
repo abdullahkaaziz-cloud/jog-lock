@@ -15,28 +15,34 @@ import UIKit
 
 final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     override func configuration(shielding application: Application) -> ShieldConfiguration {
-        shield(for: application.localizedDisplayName)
+        shield(for: application.localizedDisplayName) { LockShield.isRunOnly($0, application: application.token) }
     }
 
     override func configuration(shielding application: Application, in category: ActivityCategory) -> ShieldConfiguration {
-        shield(for: application.localizedDisplayName ?? category.localizedDisplayName)
+        shield(for: application.localizedDisplayName ?? category.localizedDisplayName) {
+            LockShield.isRunOnly($0, application: application.token, category: category.token)
+        }
     }
 
     override func configuration(shielding webDomain: WebDomain) -> ShieldConfiguration {
-        shield(for: webDomain.domain)
+        shield(for: webDomain.domain) { LockShield.isRunOnly($0, website: webDomain.token) }
     }
 
     override func configuration(shielding webDomain: WebDomain, in category: ActivityCategory) -> ShieldConfiguration {
-        shield(for: webDomain.domain ?? category.localizedDisplayName)
+        shield(for: webDomain.domain ?? category.localizedDisplayName) {
+            LockShield.isRunOnly($0, category: category.token, website: webDomain.token)
+        }
     }
 
-    private func shield(for name: String?) -> ShieldConfiguration {
+    /// `runOnly`: whether this shield is the run-only apps' rather than the daily lock's.
+    private func shield(for name: String?, runOnly: (LockState) -> Bool) -> ShieldConfiguration {
         let now = Date()
         var state = LockStore.peek()
         if let rules = state?.rules {
             state?.ledger.update(to: now, rules: rules)
         }
         let ledger = state?.ledger
+        let forRuns = state.map(runOnly) ?? false
         let green = UIColor.systemGreen
         let icon = UIImage(systemName: "figure.run",
                            withConfiguration: UIImage.SymbolConfiguration(pointSize: 56, weight: .bold))?
@@ -47,9 +53,12 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
             backgroundColor: UIColor.black.withAlphaComponent(0.6),
             icon: icon,
             title: ShieldConfiguration.Label(
-                text: ShieldText.title(app: name, remainingMeters: ledger?.remainingMeters ?? 0), color: .white),
+                text: forRuns ? ShieldText.runOnlyTitle(app: name)
+                    : ShieldText.title(app: name, remainingMeters: ledger?.remainingMeters ?? 0),
+                color: .white),
             subtitle: ShieldConfiguration.Label(
-                text: ledger.map { ShieldText.subtitle($0, at: now) } ?? ShieldText.line(at: now),
+                text: forRuns ? ShieldText.runOnlySubtitle
+                    : ledger.map { ShieldText.subtitle($0, at: now) } ?? ShieldText.line(at: now),
                 color: UIColor(white: 0.85, alpha: 1)),
             primaryButtonLabel: ShieldConfiguration.Label(text: ShieldText.button, color: .black),
             primaryButtonBackgroundColor: green,

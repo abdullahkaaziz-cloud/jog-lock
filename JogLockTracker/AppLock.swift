@@ -23,6 +23,9 @@ private actor LockRuntime {
         case choose(Data)
         case websites([String])
         case plan(RunPlan)
+        case runOnly(Data?)
+        case runStarted(String)
+        case runEnded(String?)
         case credit(String, Double, Date)
         case dailyMeters(Double)
 
@@ -37,6 +40,9 @@ private actor LockRuntime {
             case .choose: "choose apps"
             case .websites: "websites"
             case .plan: "plan"
+            case .runOnly: "run-only apps"
+            case .runStarted: "run started"
+            case .runEnded: "run ended"
             case .credit: "credit run"
             case .dailyMeters: "daily target"
             }
@@ -46,8 +52,8 @@ private actor LockRuntime {
         /// up, crediting runs) only go to the diagnostics.
         var showsErrors: Bool {
             switch self {
-            case .turnOff, .spend, .stopSpending, .borrow, .choose, .websites, .plan: true
-            case .snapshot, .refresh, .credit, .dailyMeters: false
+            case .turnOff, .spend, .stopSpending, .borrow, .choose, .websites, .plan, .runOnly: true
+            case .snapshot, .refresh, .credit, .dailyMeters, .runStarted, .runEnded: false
             }
         }
     }
@@ -81,6 +87,12 @@ private actor LockRuntime {
                 try cycle.setWebsites(websites)
             case .plan(let plan):
                 try cycle.setPlan(plan)
+            case .runOnly(let data):
+                try cycle.chooseRunOnly(data)
+            case .runStarted(let id):
+                outcome.note = try cycle.runStarted(id)
+            case .runEnded(let id):
+                try cycle.runEnded(id)
             case .credit(let id, let meters, let time):
                 outcome.unlocked = try cycle.credit(run: id, countedMeters: meters, at: time)
             case .dailyMeters(let meters):
@@ -103,6 +115,8 @@ final class AppLock: ObservableObject {
     /// The lock as last read. The runtime's copy is the real one.
     @Published private(set) var state: LockState
     @Published private(set) var selection = FamilyActivitySelection()
+    /// Apps that open only while a run is going.
+    @Published private(set) var runOnlySelection = FamilyActivitySelection()
     @Published private(set) var authorization: AuthorizationStatus
     /// True when a run has just opened the apps: shows the unlock celebration.
     @Published var celebrating = false
@@ -121,6 +135,9 @@ final class AppLock: ObservableObject {
         authorization = AuthorizationCenter.shared.authorizationStatus
         if let data = state.selection, let decoded = try? LockShield.decode(data) {
             selection = decoded
+        }
+        if let data = state.runOnly, let decoded = try? LockShield.decode(data) {
+            runOnlySelection = decoded
         }
         LockSignal.listen()
         observer = NotificationCenter.default.addObserver(forName: LockSignal.received, object: nil,
@@ -201,6 +218,7 @@ final class AppLock: ObservableObject {
             if let data = new.selection, let decoded = try? LockShield.decode(data) {
                 selection = decoded
             }
+            runOnlySelection = new.runOnly.flatMap { try? LockShield.decode($0) } ?? FamilyActivitySelection()
         }
         if let error = outcome.error, command.showsErrors {
             problem = error
@@ -343,6 +361,40 @@ final class AppLock: ObservableObject {
     /// stays and the new one starts tomorrow.
     func setDailyKm(_ km: Double) {
         Task { await perform(.dailyMeters(km * 1_000), trigger: "daily target") }
+    }
+
+    // MARK: - Run-only apps
+
+    var hasRunOnly: Bool {
+        !runOnlySelection.applicationTokens.isEmpty || !runOnlySelection.categoryTokens.isEmpty
+            || !runOnlySelection.webDomainTokens.isEmpty
+    }
+
+    /// The run-only apps are open for the run going now.
+    var runOnlyOpen: Bool { state.runOnlyOpen(at: Date()) }
+
+    /// Apps that open only while a run is going. Changing them is always
+    /// allowed: they're a treat for running, not the lock.
+    func chooseRunOnly(_ newSelection: FamilyActivitySelection) {
+        if newSelection.applicationTokens.count > LockShield.appLimit {
+            problem = "iOS can lock at most \(LockShield.appLimit) apps. Choose fewer, or a whole category."
+            return
+        }
+        let empty = newSelection.applicationTokens.isEmpty && newSelection.categoryTokens.isEmpty
+            && newSelection.webDomainTokens.isEmpty
+        let data = empty ? nil : try? LockShield.encode(newSelection)
+        runOnlySelection = empty ? FamilyActivitySelection() : newSelection
+        Task { await perform(.runOnly(data), trigger: "run-only apps chosen") }
+    }
+
+    /// A run started: the run-only apps open until it ends.
+    func runStarted(_ id: String) {
+        Task { await perform(.runStarted(id), trigger: "run started") }
+    }
+
+    /// A run ended (`id` nil: none is going): the run-only apps lock.
+    func runEnded(_ id: String?) {
+        Task { await perform(.runEnded(id), trigger: "run ended") }
     }
 
     // MARK: - Plan
