@@ -12,6 +12,16 @@ public enum Format {
         String(format: "%.2f", value)
     }
 
+    /// A distance for labels: "1.8 km", "2 km", "750 m".
+    public static func shortDistance(_ meters: Double) -> String {
+        let m = max(meters, 0)
+        if m >= 950 {
+            let km = (m / 100).rounded() / 10
+            return km == km.rounded() ? "\(Int(km)) km" : String(format: "%.1f km", km)
+        }
+        return "\(max(10, Int((m / 10).rounded()) * 10)) m"
+    }
+
     public static func duration(_ seconds: Double) -> String {
         guard seconds.isFinite, seconds >= 0 else { return "--" }
         let total = Int(seconds.rounded())
