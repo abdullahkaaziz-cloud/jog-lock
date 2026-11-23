@@ -10,7 +10,9 @@
 import AVFoundation
 import JogLockCore
 
-final class VoiceSpeaker: NSObject, AVSpeechSynthesizerDelegate {
+// Only used from the main actor (RunTracker). The iOS 26 SDK makes the
+// delegate protocol Sendable, and AVSpeechSynthesizer isn't marked Sendable.
+final class VoiceSpeaker: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable {
     private let synthesizer = AVSpeechSynthesizer()
 
     override init() {
