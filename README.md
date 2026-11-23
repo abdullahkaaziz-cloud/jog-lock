@@ -39,6 +39,11 @@ Tap **Choose apps to lock** on the home screen. iOS asks for Screen Time access 
 - **No easy way out.** While the apps are locked you can add apps but not remove them. The lock can only be turned off (the ⋯ menu on the card) after the day's run.
   - **Settings → App lock** shows how to stop yourself switching off Screen Time access: someone you trust keeps a Screen Time passcode.
 - **Changing the target** while the lock is on takes effect tomorrow, so you can't lower it to unlock today.
+- **Your plan** (**Change** on the plan card):
+  - **Daily:** the same distance every run day.
+  - **Weekly:** a week's distance shared over your run days. Run more one day and the next days need less; finish the week and the rest of it is open. A missed day isn't added to the next, and minutes bank only past the week's distance.
+  - **5K plan:** nine weeks of three runs, from 1 km of running and walking to 5 km without stopping. Each run starts with a 3-minute walk, and the voice coach calls every run and walk.
+  - **Rest days** in any plan are open all day. Distance owed from borrowing waits for the next run day. Like the target, a change starts tomorrow while the lock is on.
 - **Websites typed in by name.** For websites the picker doesn't list: ⋯ → **Websites**, then type `instagram.com` (or paste a whole address). They're blocked in Safari and other browsers, subdomains too, with iOS's own "Restricted" page. Up to 40 websites in all, chosen and typed; while locked they can only be added.
 - **Time on apps.** Once Screen Time is connected, a card at the bottom of the home screen shows a day on average this week against last week, what this week's time would take to run for (15 minutes a km), and the five apps used most. With the lock on it covers the locked apps; otherwise every app. A separate extension draws it, and iOS keeps the numbers inside that extension: Jog Lock never sees them.
 - **Diagnostics.** If something looks wrong, Settings → App lock → **Share lock diagnostics**. It shows what the lock did and when, never which apps you chose.
@@ -199,6 +204,7 @@ JogLockTracker/             the iPhone app
   RunActivityController.swift  starts and updates the lock-screen countdown
   AppLock.swift             the app lock: Screen Time access, picked apps, unlocks
   AppLockCard.swift         the lock on the home screen
+  PlanCard.swift            the plan: daily, weekly or the 5K plan, and rest days
   WebsitesView.swift        websites typed in by name
   TimeOnAppsCard.swift      the Time on apps card (the report extension draws its numbers)
   UnlockCelebration.swift   the unlock moment

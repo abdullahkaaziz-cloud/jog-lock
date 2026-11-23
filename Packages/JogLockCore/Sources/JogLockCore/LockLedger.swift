@@ -72,6 +72,9 @@ public struct LockRules: Codable, Equatable, Sendable {
     public var borrowBelowMinutes: Double
     /// The hour a new day starts and the apps lock again.
     public var dayStartHour: Int
+    /// Rest days, a weekly target or the 5K plan. Nil (as saved before plans
+    /// existed): the daily distance every day.
+    public var plan: RunPlan?
 
     /// iOS monitors no interval under 15 minutes, so a day ending sooner is
     /// monitored this long. The app ends it on time whenever it's open.
@@ -88,7 +91,8 @@ public struct LockRules: Codable, Equatable, Sendable {
                 borrowMeters: Double = 1_000,
                 maxOwedMeters: Double = 3_000,
                 borrowBelowMinutes: Double = 15,
-                dayStartHour: Int = 4) {
+                dayStartHour: Int = 4,
+                plan: RunPlan? = nil) {
         self.dailyMeters = dailyMeters
         self.minutesPerExtraKm = minutesPerExtraKm
         self.maxBankMinutes = maxBankMinutes
@@ -97,6 +101,12 @@ public struct LockRules: Codable, Equatable, Sendable {
         self.maxOwedMeters = maxOwedMeters
         self.borrowBelowMinutes = borrowBelowMinutes
         self.dayStartHour = dayStartHour
+        self.plan = plan
+    }
+
+    /// The plan in force: a daily one when none was set.
+    public var runPlan: RunPlan {
+        plan ?? RunPlan()
     }
 
     /// The lock day `date` falls in.
@@ -190,15 +200,35 @@ public struct LockLedger: Codable, Equatable, Sendable {
     private var bankedMeters: Double = 0
     /// The part of a run credited to the day before (a run past the day's start).
     private var carried: [String: Double] = [:]
+    /// Today is a rest day. Optional, like the next two, so a ledger saved
+    /// before plans existed still reads.
+    private var restDay: Bool?
+    /// This week's counted distance before today.
+    private var week: WeekTally?
+    /// Distance today past which runs bank minutes; nil: the target.
+    private var bankAfter: Double?
 
     public init(day: LockDay, rules: LockRules) {
         self.day = day
-        targetMeters = rules.dailyMeters
+        let plan = rules.runPlan
+        restDay = plan.isRestDay(day)
+        week = WeekTally(start: day.weekStart(firstWeekday: plan.firstWeekday), meters: 0)
+        targetMeters = plan.target(on: day, dailyMeters: rules.dailyMeters, weekBefore: 0)
+        bankAfter = plan.bankAfter(target: targetMeters, owed: 0, on: day, weekBefore: 0)
     }
 
     /// Counted distance run today.
     public var ranMeters: Double {
         runs.values.reduce(0, +)
+    }
+
+    public var isRestDay: Bool {
+        restDay ?? false
+    }
+
+    /// Counted distance this week, today's included.
+    public var weekMeters: Double {
+        (week?.meters ?? 0) + ranMeters
     }
 
     public var remainingMeters: Double {
@@ -256,17 +286,25 @@ public struct LockLedger: Codable, Equatable, Sendable {
     public mutating func update(to now: Date, rules: LockRules, calendar: Calendar = .current) -> Bool {
         let today = rules.day(of: now, calendar: calendar)
         guard today > day else { return false }
-        startDay(today, rules: rules)
+        startDay(today, rules: rules, at: now)
         return true
     }
 
-    /// A new day. What was owed is paid if the last day's target was met;
-    /// otherwise it carries over, along with anything borrowed that day.
-    private mutating func startDay(_ newDay: LockDay, rules: LockRules) {
-        owedMeters = (isTargetMet ? 0 : owedMeters) + borrowedMeters
+    /// A new day. What was owed is paid if the last day's target was met
+    /// (a rest day pays nothing); otherwise it carries over, along with
+    /// anything borrowed that day. The day's runs go into the week's tally.
+    private mutating func startDay(_ newDay: LockDay, rules: LockRules, at now: Date) {
+        owedMeters = (isTargetMet && !isRestDay ? 0 : owedMeters) + borrowedMeters
         borrowedMeters = 0
+        let firstWeekday = rules.runPlan.firstWeekday
+        let newWeek = newDay.weekStart(firstWeekday: firstWeekday)
+        if day.weekStart(firstWeekday: firstWeekday) == newWeek {
+            let before = week?.start == newWeek ? week?.meters ?? 0 : 0
+            week = WeekTally(start: newWeek, meters: before + ranMeters)
+        } else {
+            week = WeekTally(start: newWeek, meters: 0)
+        }
         day = newDay
-        targetMeters = rules.dailyMeters + owedMeters
         var nextCarried: [String: Double] = [:]
         for (id, meters) in runs {
             nextCarried[id] = meters + (carried[id] ?? 0)
@@ -278,13 +316,21 @@ public struct LockLedger: Codable, Equatable, Sendable {
         if monitor?.purpose == .day {
             monitor = nil       // its day is over
         }
+        resetTarget(rules: rules, at: now)
     }
 
-    /// Sets today's target from the current setting. For when the lock is
-    /// turned on, or the setting changes while it's off.
+    /// Sets today's target from the plan, plus what's owed (not on a rest
+    /// day). A rest day, or a day the week's running already covers, opens
+    /// straight away. Called as each day starts, when the lock is turned on,
+    /// and when the setting changes while it's off.
     public mutating func resetTarget(rules: LockRules, at now: Date) {
-        targetMeters = rules.dailyMeters + owedMeters
-        if unlockedAt == nil && ranMeters > 0 && ranMeters >= targetMeters {
+        let plan = rules.runPlan
+        let rest = plan.isRestDay(day)
+        let before = week?.start == day.weekStart(firstWeekday: plan.firstWeekday) ? week?.meters ?? 0 : 0
+        restDay = rest
+        targetMeters = rest ? 0 : plan.target(on: day, dailyMeters: rules.dailyMeters, weekBefore: before) + owedMeters
+        bankAfter = plan.bankAfter(target: targetMeters, owed: rest ? 0 : owedMeters, on: day, weekBefore: before)
+        if unlockedAt == nil && ranMeters >= targetMeters {
             unlockedAt = now
             spending = false
         }
@@ -306,7 +352,7 @@ public struct LockLedger: Codable, Equatable, Sendable {
             justUnlocked = true
         }
         if unlockedAt != nil {
-            let extra = ranMeters - targetMeters
+            let extra = ranMeters - (bankAfter ?? targetMeters)
             if extra > bankedMeters {
                 let earned = (extra - bankedMeters) / 1_000 * rules.minutesPerExtraKm
                 if bankMinutes < rules.maxBankMinutes {

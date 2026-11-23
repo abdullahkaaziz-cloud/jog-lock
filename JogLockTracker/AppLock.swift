@@ -22,6 +22,7 @@ private actor LockRuntime {
         case snapshot, refresh, turnOff, spend, stopSpending, borrow
         case choose(Data)
         case websites([String])
+        case plan(RunPlan)
         case credit(String, Double, Date)
         case dailyMeters(Double)
 
@@ -35,6 +36,7 @@ private actor LockRuntime {
             case .borrow: "borrow"
             case .choose: "choose apps"
             case .websites: "websites"
+            case .plan: "plan"
             case .credit: "credit run"
             case .dailyMeters: "daily target"
             }
@@ -44,7 +46,7 @@ private actor LockRuntime {
         /// up, crediting runs) only go to the diagnostics.
         var showsErrors: Bool {
             switch self {
-            case .turnOff, .spend, .stopSpending, .borrow, .choose, .websites: true
+            case .turnOff, .spend, .stopSpending, .borrow, .choose, .websites, .plan: true
             case .snapshot, .refresh, .credit, .dailyMeters: false
             }
         }
@@ -77,6 +79,8 @@ private actor LockRuntime {
                 try cycle.choose(selection)
             case .websites(let websites):
                 try cycle.setWebsites(websites)
+            case .plan(let plan):
+                try cycle.setPlan(plan)
             case .credit(let id, let meters, let time):
                 outcome.unlocked = try cycle.credit(run: id, countedMeters: meters, at: time)
             case .dailyMeters(let meters):
@@ -341,6 +345,43 @@ final class AppLock: ObservableObject {
         Task { await perform(.dailyMeters(km * 1_000), trigger: "daily target") }
     }
 
+    // MARK: - Plan
+
+    /// Rest days, a weekly target or the 5K plan.
+    var plan: RunPlan { state.rules.runPlan }
+
+    /// Today, as the lock counts days (they start at 4:00).
+    var today: LockDay { state.rules.day(of: Date()) }
+
+    /// While the lock is on, a new plan starts tomorrow.
+    func setPlan(_ plan: RunPlan) {
+        state.rules.plan = plan       // shown now, saved by the runtime
+        Task { await perform(.plan(plan), trigger: "plan") }
+    }
+
+    /// Starts the 5K plan at week 1: today, or tomorrow while the lock is on.
+    func startFiveK(restDays: Set<Int>) {
+        var plan = self.plan
+        plan.kind = .fiveK
+        plan.restDays = restDays
+        plan.firstWeekday = Calendar.current.firstWeekday
+        plan.fiveKStart = isEnabled ? today.adding(days: 1) : today
+        setPlan(plan)
+    }
+
+    /// Does the current 5K plan week again: the plan moves a week later.
+    func repeatFiveKWeek() {
+        var plan = self.plan
+        guard plan.kind == .fiveK, let start = plan.fiveKStart, plan.fiveKWeekNumber(on: today) > 1 else { return }
+        plan.fiveKStart = start.adding(days: 7)
+        setPlan(plan)
+    }
+
+    /// The 5K plan's week for a run today, when that's the plan.
+    var fiveKWeekToday: FiveKWeek? {
+        plan.kind == .fiveK ? plan.fiveKWeek(on: today) : nil
+    }
+
     // MARK: - Runs
 
     /// What the next run has to cover: what's left of today's target while
@@ -348,8 +389,14 @@ final class AppLock: ObservableObject {
     func runTargetKm(default km: Double) -> Double {
         var ledger = state.ledger
         ledger.update(to: Date(), rules: state.rules)
-        guard state.enabled, !ledger.isTargetMet, ledger.remainingMeters > 0 else { return km }
-        return ledger.remainingMeters / 1_000
+        if state.enabled, !ledger.isTargetMet, ledger.remainingMeters > 0 {
+            return ledger.remainingMeters / 1_000
+        }
+        // A weekly or 5K plan sets the distance; the setting is for daily ones.
+        if plan.kind != .daily, ledger.targetMeters > 0 {
+            return ledger.targetMeters / 1_000
+        }
+        return km
     }
 
     /// A run's counted distance so far. Saved to the lock every 25 m, at the

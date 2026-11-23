@@ -77,6 +77,9 @@ final class RunTracker: NSObject, ObservableObject {
     private var routeBuilder = RouteBuilder()
     private var coach = VoiceCoachPlanner()
     private var coachVariant = 0
+    private var intervalCoach: IntervalCoach?
+    private var intervalVariant = 0
+    private var intervalTask: Task<Void, Never>?
     private var niceTryDetector = NiceTryDetector()
     private let speaker = VoiceSpeaker()
     private let liveActivity = RunActivityController()
@@ -124,6 +127,7 @@ final class RunTracker: NSObject, ObservableObject {
         }
         guard !isStopping else { return }
         isStopping = true
+        stopIntervals()
         updatesTask?.cancel()
         updatesTask = nil
         endSessions()
@@ -274,6 +278,40 @@ final class RunTracker: NSObject, ObservableObject {
         }
         startMotion(from: now)
         liveActivity.start(app: AppSettings.shared.nemesis, startedAt: now, targetMeters: runTargetKm * 1000)
+        startIntervals(at: now)
+    }
+
+    // MARK: - 5K plan intervals
+
+    /// On a 5K plan run, the coach calls the warm-up, run and walk intervals,
+    /// checked every second. They're spoken even with the funny lines off:
+    /// they're the plan's instructions.
+    private func startIntervals(at start: Date) {
+        stopIntervals()
+        intervalCoach = AppLock.shared.fiveKWeekToday.map { IntervalCoach(week: $0) }
+        guard intervalCoach != nil else { return }
+        intervalTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                self.checkInterval(since: start)
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    private func checkInterval(since start: Date) {
+        guard runID != nil, let cue = intervalCoach?.cue(at: Date().timeIntervalSince(start)) else { return }
+        logEvent("interval", detail: "\(cue.phase)")
+        let settings = AppSettings.shared
+        let line = VoiceLines.interval(cue, app: settings.nemesis, variant: intervalVariant)
+        intervalVariant += 1
+        speaker.speak(line, style: settings.voiceStyle)
+    }
+
+    private func stopIntervals() {
+        intervalTask?.cancel()
+        intervalTask = nil
+        intervalCoach = nil
     }
 
     private func startMotion(from start: Date) {

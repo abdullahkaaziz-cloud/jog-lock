@@ -49,7 +49,7 @@ struct ContentView: View {
 
                     if !tracker.isActive {
                         modePicker
-                        targetStepper
+                        PlanCard(targetKm: $tracker.targetKm)
                         if tracker.mode == .treadmill {
                             treadmillCard
                         }
@@ -228,27 +228,6 @@ struct ContentView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-    }
-
-    private var targetStepper: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Stepper(value: $tracker.targetKm, in: 0.25...20, step: 0.25) {
-                HStack {
-                    Label(lock.isEnabled ? "Daily target" : "Unlock target", systemImage: "lock.fill")
-                    Spacer()
-                    Text("\(Format.km(tracker.targetKm)) km")
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                }
-            }
-            if lock.isEnabled && abs(lock.ledger.targetMeters - lock.ledger.owedMeters - lock.rules.dailyMeters) > 1 {
-                Text("Today stays at \(Format.shortDistance(lock.ledger.targetMeters)). The new target starts tomorrow.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding()
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 

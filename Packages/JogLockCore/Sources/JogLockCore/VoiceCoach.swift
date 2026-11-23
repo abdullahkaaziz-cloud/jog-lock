@@ -182,3 +182,32 @@ public struct NiceTryDetector: Sendable {
         return nil
     }
 }
+
+// MARK: - 5K plan intervals
+
+extension VoiceLines {
+    /// What the coach says as a 5K plan run moves to its next phase.
+    public static func interval(_ cue: IntervalCoach.Cue, app: String, variant: Int) -> String {
+        let length = FiveKWeek.duration(cue.seconds ?? 60)
+        switch cue.phase {
+        case .warmUp:
+            return "Week \(cue.week) of your 5K plan. Warm up first: walk briskly for \(length)."
+        case .run:
+            let lines = [
+                "Run for \(length). \(app) is waiting at the finish.",
+                "Run for \(length). Easy pace: you should still be able to talk.",
+                "Run for \(length). Your thumbs are jealous.",
+            ]
+            return lines[abs(variant) % lines.count]
+        case .walk:
+            let lines = [
+                "Walk for \(length). Catch your breath.",
+                "Walk for \(length). Nice work.",
+                "Walk for \(length). Shake your arms out.",
+            ]
+            return lines[abs(variant) % lines.count]
+        case .runAllTheWay:
+            return "Week \(cue.week). No walking today: run the whole way. Slow is fine."
+        }
+    }
+}

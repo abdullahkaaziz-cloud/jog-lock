@@ -343,6 +343,19 @@ final class LockCycle {
         }
     }
 
+    /// Rest days, a weekly target or the 5K plan. While the lock is on,
+    /// today stays as it is and the plan starts tomorrow, so a rest day
+    /// can't be made today to open the apps.
+    func setPlan(_ plan: RunPlan?) throws {
+        try transaction { state in
+            guard state.rules.plan != plan else { return }
+            state.rules.plan = plan
+            if !state.enabled {
+                state.ledger.resetTarget(rules: state.rules, at: Date())
+            }
+        }
+    }
+
     // MARK: - Diagnostics
 
     /// The state for the logs: counts only, never which apps.
@@ -352,7 +365,8 @@ final class LockCycle {
             "enabled": state.enabled, "day": ledger.day.description,
             "target_m": Int(ledger.targetMeters), "ran_m": Int(ledger.ranMeters), "owed_m": Int(ledger.owedMeters),
             "bank_min": ledger.bankMinutes, "spending": ledger.spending, "target_met": ledger.isTargetMet,
-            "open": ledger.isOpen,
+            "open": ledger.isOpen, "plan": state.rules.runPlan.kind.rawValue, "rest_day": ledger.isRestDay,
+            "week_m": Int(ledger.weekMeters),
         ]
         if let monitor = ledger.monitor {
             entry["monitor"] = String(monitor.name.suffix(8))
