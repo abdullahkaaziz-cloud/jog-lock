@@ -64,6 +64,7 @@ struct ContentView: View {
                     if !tracker.isActive, let run = tracker.lastFinishedRun {
                         lastRunCard(run)
                         ShareRunButton(run: run)
+                        ReelButton(run: run)
                     }
 
                     if !tracker.isActive && lock.isAuthorized {

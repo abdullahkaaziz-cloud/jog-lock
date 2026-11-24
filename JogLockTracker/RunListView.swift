@@ -112,6 +112,9 @@ struct RunDetailView: View {
                 ShareRunButton(run: run)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
+                ReelButton(run: run)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
             }
             if let rejected = rejectedMeters {
                 Section {

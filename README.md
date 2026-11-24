@@ -58,6 +58,7 @@ It needs a paid Apple Developer team, because free Personal Teams can't use Fami
 - **Nice try.** When the step check throws out distance (car, bike, or GPS distance without the steps), a "Nice try." card appears and the coach says so. The card can be shared.
 - **Lock-screen countdown.** During a run the lock screen and Dynamic Island show "0.8 km to TikTok", a progress bar and the time. It stays on the lock screen for 15 minutes after the run.
 - **Share card.** After a run, "Share this run" makes a story-sized image (1080 × 1920): your route as line art, the distance, time and pace.
+- **Reels.** After a run (or from its details), "Make a reel" makes a 10-second story video on the phone: your route draws itself while the kilometres tick up, the lock shakes and springs open, then "TikTok unlocked". Share it, or save it to Photos to post.
 - **Your month.** On the Runs screen, the sparkles button wraps up a month as a story-sized card: kilometres run for your apps, runs, longest run, days in a row, the time of day you run most, Nice trys caught, the distance next to a marathon or the English Channel, and the scrolling it paid for at 15 minutes a km.
 - **Shoe mileage.** Add your pairs (home screen or Settings → Shoes). Each run's counted distance goes to the pair you're wearing, treadmill runs included. You get a notification at 80% of a pair's limit (650 km unless you change it; running shoes usually last 500–800 km) and at the limit.
 
@@ -214,6 +215,7 @@ JogLockTracker/             the iPhone app
   WebsitesView.swift        websites typed in by name
   TimeOnAppsCard.swift      the Time on apps receipt (the report extension draws its numbers)
   WrappedView.swift         your month, wrapped up to share
+  RunReel.swift             a run as a 10-second story video
   UnlockCelebration.swift   the unlock moment
   StrideStore.swift         the learned stride samples, kept on the phone
   RunStore+Device.swift     where runs are saved on the phone

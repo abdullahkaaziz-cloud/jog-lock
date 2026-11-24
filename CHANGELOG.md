@@ -6,6 +6,7 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ### Added
 
+- Make a reel: a 10-second 1080 × 1920 video of a run, made on the phone (timing in `ReelTimeline`, with tests).
 - Time on apps as a receipt to screenshot: km paid this week against what the app time would cost at 15 minutes a km. A monthly Wrapped card from the Runs screen (`MonthWrap`, with tests).
 - Shoe mileage: kilometres per pair, credited once per run to the pair being worn, with a heads-up at 80% of the pair's limit and at the limit.
 - Run-only apps: a second set of apps, locked except while a run is going (their own shield store, with a monitor that locks them four hours on at the latest).
