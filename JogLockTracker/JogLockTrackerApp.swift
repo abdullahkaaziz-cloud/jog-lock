@@ -40,11 +40,16 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     }
 
     /// A lock buddy's day changed in iCloud: sync it, even in the background.
-    nonisolated func application(_ application: UIApplication,
-                                 didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
-        guard CKNotification(fromRemoteNotificationDictionary: userInfo) != nil else { return .noData }
-        await LockBuddies.shared.sync(reason: "push")
-        return .newData
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+                     fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        guard CKNotification(fromRemoteNotificationDictionary: userInfo) != nil else {
+            completionHandler(.noData)
+            return
+        }
+        Task {
+            await LockBuddies.shared.sync(reason: "push")
+            completionHandler(.newData)
+        }
     }
 
     /// A scene delegate of our own, for invite links to a lock buddies team.
