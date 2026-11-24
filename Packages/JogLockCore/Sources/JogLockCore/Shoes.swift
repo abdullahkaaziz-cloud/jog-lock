@@ -54,7 +54,7 @@ public enum ShoeAlert: Equatable, Sendable {
     public var title: String {
         switch self {
         case .nearlyDone(let name, _): "\(name) are getting tired"
-        case .done(let name, _): "Time for new shoes"
+        case .done: "Time for new shoes"
         }
     }
 
