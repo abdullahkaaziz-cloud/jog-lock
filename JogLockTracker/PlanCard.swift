@@ -53,14 +53,14 @@ struct PlanCard: View {
                     HStack {
                         Text("Each week")
                         Spacer()
-                        Text("\(Format.km(plan.weeklyMeters / 1_000)) km")
+                        Text(Format.shortDistance(plan.weeklyMeters))
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
                     }
                 }
                 ProgressView(value: min(1, ledger.weekMeters / max(1, plan.weeklyMeters)))
                     .tint(.green)
-                Text("This week: \(Format.km(ledger.weekMeters / 1_000)) of \(Format.km(plan.weeklyMeters / 1_000)) km. "
+                Text("This week: \(PlanText.distance(ledger.weekMeters)) of \(Format.shortDistance(plan.weeklyMeters)). "
                      + (ledger.isRestDay || ledger.targetMeters <= 0
                         ? "Today's covered."
                         : "Today: \(Format.shortDistance(ledger.targetMeters))."))
@@ -130,7 +130,7 @@ struct PlanView: View {
                     }
                 case .weekly:
                     Section {
-                        Stepper("Each week: \(Format.km(plan.weeklyMeters / 1_000)) km", value: weeklyKm, in: 2...100, step: 1)
+                        Stepper("Each week: \(Format.shortDistance(plan.weeklyMeters))", value: weeklyKm, in: 2...100, step: 1)
                     } footer: {
                         Text("That's \(Format.shortDistance(plan.weeklyShare)) a run day.")
                     }
@@ -279,6 +279,11 @@ enum PlanText {
         case .fiveK:
             "Never run before? Start at 1 km of running and walking and build to 5K in nine weeks."
         }
+    }
+
+    /// "1.8 km", or "0 km" before any running.
+    static func distance(_ meters: Double) -> String {
+        meters < 10 ? "0 km" : Format.shortDistance(meters)
     }
 
     /// Weekday numbers (1 Sunday to 7 Saturday) from the week's first day.

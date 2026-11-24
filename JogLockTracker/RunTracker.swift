@@ -181,6 +181,9 @@ final class RunTracker: NSObject, ObservableObject {
         let summary = makeSummary(id: id, endedAt: end)
         try? RunStore.onDevice.save(summary)
         lastFinishedRun = summary
+        if let alert = ShoeStore.shared.credit(run: id, meters: gateTotals.countedMeters) {
+            notify(title: alert.title, body: alert.body)
+        }
         if runMode == .outdoor {
             learnStride(fromRun: id)
         }

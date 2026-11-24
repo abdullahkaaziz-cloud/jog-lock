@@ -53,6 +53,7 @@ struct ContentView: View {
                     if !tracker.isActive {
                         modePicker
                         PlanCard(targetKm: $tracker.targetKm)
+                        ShoesRow()
                         if tracker.mode == .treadmill {
                             treadmillCard
                         }

@@ -41,6 +41,15 @@ struct SettingsView: View {
                     }
                 }
                 Section {
+                    NavigationLink {
+                        ShoesView()
+                    } label: {
+                        Label("Shoes", systemImage: "shoe.2.fill")
+                    }
+                } footer: {
+                    Text("Kilometres on each pair, with a heads-up when they're getting tired.")
+                }
+                Section {
                     DisclosureGroup("Make the lock harder to switch off") {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Otherwise anyone with your Face ID can turn off Jog Lock's Screen Time access in Settings.")
