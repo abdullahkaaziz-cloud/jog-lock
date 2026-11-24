@@ -20,7 +20,22 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CKSharingSupported</key>
+	<true/>
 	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>RunDistance</key>
+		<string>Precise location is needed to measure your run distance accurately.</string>
+	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Jog Tracker uses your location during a run to measure how far you have jogged.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Jog Tracker counts your steps to check the distance was covered on foot, not in a car or on a bike.</string>
+	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
@@ -31,6 +46,14 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>location</string>
+		<string>remote-notification</string>
+	</array>
+	<key>UIFileSharingEnabled</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UILaunchScreen</key>
@@ -40,28 +63,5 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Jog Tracker uses your location during a run to measure how far you have jogged.</string>
-	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
-	<dict>
-		<key>RunDistance</key>
-		<string>Precise location is needed to measure your run distance accurately.</string>
-	</dict>
-	<key>NSMotionUsageDescription</key>
-	<string>Jog Tracker counts your steps to check the distance was covered on foot, not in a car or on a bike.</string>
-	<key>NSSupportsLiveActivities</key>
-	<true/>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>audio</string>
-		<string>location</string>
-		<string>remote-notification</string>
-	</array>
-	<key>CKSharingSupported</key>
-	<true/>
-	<key>UIFileSharingEnabled</key>
-	<true/>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<true/>
 </dict>
 </plist>
