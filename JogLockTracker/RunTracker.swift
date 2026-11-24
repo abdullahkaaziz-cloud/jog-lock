@@ -5,6 +5,7 @@
 //  Runs a jog: asks for location access, streams Core Location fitness
 //  updates (also with the screen locked), feeds them to DistanceEngine,
 //  logs every fix, and tells you when the target distance is reached.
+//  Counted distance goes to the app lock as the run goes.
 //
 //  If iOS kills the app mid-run, it relaunches it in the background for the
 //  next location update; the run resumes by replaying its own log.
@@ -41,7 +42,10 @@ final class RunTracker: NSObject, ObservableObject {
     @Published private(set) var diagnostic: String?
     @Published private(set) var lastFinishedRun: RunSummary?
     @Published var targetKm: Double {
-        didSet { UserDefaults.standard.set(targetKm, forKey: Keys.targetKm) }
+        didSet {
+            UserDefaults.standard.set(targetKm, forKey: Keys.targetKm)
+            AppLock.shared.setDailyKm(targetKm)
+        }
     }
     /// The mode the next run starts in.
     @Published var mode: RunMode {
@@ -51,6 +55,10 @@ final class RunTracker: NSObject, ObservableObject {
     @Published private(set) var runMode: RunMode = .outdoor
     @Published private(set) var strideModel: StrideModel?
     @Published private(set) var lastCadence: Double?
+    /// The counted route so far, for the live map.
+    @Published private(set) var route: [[Coordinate]] = []
+    /// Set when the step check has just thrown out distance ("nice try").
+    @Published private(set) var niceTry: NiceTryEvent?
 
     /// True from tapping Start until the run is stopped.
     var isActive: Bool { status != .idle }
@@ -66,6 +74,15 @@ final class RunTracker: NSObject, ObservableObject {
 
     private let manager = CLLocationManager()   // only used for permission prompts
     private var counter = RunCounter(start: 0)
+    private var routeBuilder = RouteBuilder()
+    private var coach = VoiceCoachPlanner()
+    private var coachVariant = 0
+    private var intervalCoach: IntervalCoach?
+    private var intervalVariant = 0
+    private var intervalTask: Task<Void, Never>?
+    private var niceTryDetector = NiceTryDetector()
+    private let speaker = VoiceSpeaker()
+    private let liveActivity = RunActivityController()
     private var treadmill: TreadmillCounter?
     private let motion = MotionTracker()
     private var isStopping = false
@@ -86,9 +103,13 @@ final class RunTracker: NSObject, ObservableObject {
         targetKm = saved > 0 ? saved : 1.0
         mode = RunMode(rawValue: UserDefaults.standard.string(forKey: Keys.mode) ?? "") ?? .outdoor
         super.init()
+        AppLock.shared.setDailyKm(targetKm)
         manager.delegate = self
         observeAppState()
         resumeIfNeeded()
+        if runID == nil {
+            AppLock.shared.runEnded(nil)    // run-only apps left open by a run that's gone
+        }
         loadStrideModel()
     }
 
@@ -109,6 +130,8 @@ final class RunTracker: NSObject, ObservableObject {
         }
         guard !isStopping else { return }
         isStopping = true
+        stopIntervals()
+        AppLock.shared.runEnded(id)
         updatesTask?.cancel()
         updatesTask = nil
         endSessions()
@@ -146,6 +169,11 @@ final class RunTracker: NSObject, ObservableObject {
             gateTotals = counter.gate.totals
         }
         checkTargets(at: end, notifyUser: false)
+        progressChanged(at: end)
+        AppLock.shared.credit(run: id, countedMeters: gateTotals.countedMeters, at: end, finished: true)
+        liveActivity.end(final: RunActivityAttributes.ContentState(
+            meters: gateTotals.countedMeters, targetMeters: runTargetKm * 1000,
+            unlocked: countedTargetReached, paused: false))
         logEvent("stop", totals: true)
         writer?.close()
         writer = nil
@@ -153,6 +181,9 @@ final class RunTracker: NSObject, ObservableObject {
         let summary = makeSummary(id: id, endedAt: end)
         try? RunStore.onDevice.save(summary)
         lastFinishedRun = summary
+        if let alert = ShoeStore.shared.credit(run: id, meters: gateTotals.countedMeters) {
+            notify(title: alert.title, body: alert.body)
+        }
         if runMode == .outdoor {
             learnStride(fromRun: id)
         }
@@ -166,6 +197,10 @@ final class RunTracker: NSObject, ObservableObject {
 
     func clearWarning() {
         warning = nil
+    }
+
+    func clearNiceTry() {
+        niceTry = nil
     }
 
     private func startRun() async {
@@ -205,7 +240,8 @@ final class RunTracker: NSObject, ObservableObject {
 
         let now = Date()
         runID = id
-        runTargetKm = targetKm
+        // With the app lock on, the run is what's left of today's target.
+        runTargetKm = AppLock.shared.runTargetKm(default: targetKm)
         runMode = newMode
         counter = RunCounter(start: now.timeIntervalSince1970)
         snapshot = counter.engine.snapshot
@@ -218,6 +254,11 @@ final class RunTracker: NSObject, ObservableObject {
             gateTotals = counter.gate.totals
         }
         lastCadence = nil
+        routeBuilder = RouteBuilder()
+        route = []
+        coach = VoiceCoachPlanner()
+        niceTryDetector = NiceTryDetector()
+        niceTry = nil
         startedAt = now
         countedTargetReached = false
         countedTargetAt = nil
@@ -243,6 +284,42 @@ final class RunTracker: NSObject, ObservableObject {
             status = .tracking
         }
         startMotion(from: now)
+        liveActivity.start(app: AppSettings.shared.nemesis, startedAt: now, targetMeters: runTargetKm * 1000)
+        startIntervals(at: now)
+        AppLock.shared.runStarted(id)
+    }
+
+    // MARK: - 5K plan intervals
+
+    /// On a 5K plan run, the coach calls the warm-up, run and walk intervals,
+    /// checked every second. They're spoken even with the funny lines off:
+    /// they're the plan's instructions.
+    private func startIntervals(at start: Date) {
+        stopIntervals()
+        intervalCoach = AppLock.shared.fiveKWeekToday.map { IntervalCoach(week: $0) }
+        guard intervalCoach != nil else { return }
+        intervalTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                self.checkInterval(since: start)
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    private func checkInterval(since start: Date) {
+        guard runID != nil, let cue = intervalCoach?.cue(at: Date().timeIntervalSince(start)) else { return }
+        logEvent("interval", detail: "\(cue.phase)")
+        let settings = AppSettings.shared
+        let line = VoiceLines.interval(cue, app: settings.nemesis, variant: intervalVariant)
+        intervalVariant += 1
+        speaker.speak(line, style: settings.voiceStyle)
+    }
+
+    private func stopIntervals() {
+        intervalTask?.cancel()
+        intervalTask = nil
+        intervalCoach = nil
     }
 
     private func startMotion(from start: Date) {
@@ -293,6 +370,12 @@ final class RunTracker: NSObject, ObservableObject {
         let decision = counter.add(GPSFix(location: location, stationary: stationary))
         snapshot = counter.engine.snapshot
         gateTotals = counter.gate.totals
+        let routeBefore = routeBuilder.segments.count
+        routeBuilder.add(Coordinate(lat: location.coordinate.latitude, lon: location.coordinate.longitude),
+                         decision: decision)
+        if decision == .accepted || routeBuilder.segments.count != routeBefore {
+            route = routeBuilder.segments
+        }
         lastAccuracy = location.horizontalAccuracy >= 0 ? location.horizontalAccuracy : nil
         writeFix(location, stationary: stationary, decision: decision)
 
@@ -309,6 +392,7 @@ final class RunTracker: NSObject, ObservableObject {
             logEvent("gpsReady")
         }
         checkTargets(at: location.timestamp, notifyUser: true)
+        progressChanged(at: location.timestamp)
     }
 
     private func handleSteps(_ sample: StepSample, meters: Double?, cadence: Double?) {
@@ -323,6 +407,7 @@ final class RunTracker: NSObject, ObservableObject {
         lastCadence = cadence
         writeSteps(sample, meters: meters, cadence: cadence, detail: nil)
         checkTargets(at: Date(timeIntervalSince1970: sample.t), notifyUser: true)
+        progressChanged(at: Date(timeIntervalSince1970: sample.t))
     }
 
     private func handleMotion(_ sample: MotionSample) {
@@ -356,6 +441,37 @@ final class RunTracker: NSObject, ObservableObject {
         }
     }
 
+    // MARK: - Voice coach and "nice try"
+
+    /// After every change in distance: the app lock, the voice coach, "nice try" cards and the
+    /// lock-screen countdown.
+    private func progressChanged(at time: Date) {
+        if let runID {
+            AppLock.shared.credit(run: runID, countedMeters: gateTotals.countedMeters, at: time)
+        }
+        if let event = niceTryDetector.check(gateTotals, at: time.timeIntervalSince1970) {
+            niceTry = event
+            logEvent("niceTry", detail: event.kind.rawValue)
+            say(.niceTry(event.kind))
+        }
+        let live = gateTotals.countedMeters + gateTotals.pendingMeters
+        if let cue = coach.cue(meters: live, target: runTargetKm * 1000, unlocked: countedTargetReached) {
+            say(cue)
+        }
+        liveActivity.update(meters: live, targetMeters: runTargetKm * 1000,
+                            unlocked: countedTargetReached, paused: status == .paused)
+    }
+
+    private func say(_ cue: VoiceCue) {
+        let settings = AppSettings.shared
+        guard settings.voiceOn else { return }
+        let live = gateTotals.countedMeters + gateTotals.pendingMeters
+        let line = VoiceLines.text(for: cue, app: settings.nemesis,
+                                   remainingMeters: max(0, runTargetKm * 1000 - live), variant: coachVariant)
+        coachVariant += 1
+        speaker.speak(line, style: settings.voiceStyle)
+    }
+
     private func checkTargets(at time: Date, notifyUser: Bool) {
         let goal = runTargetKm * 1000
         if !countedTargetReached && gateTotals.countedMeters >= goal {
@@ -364,8 +480,13 @@ final class RunTracker: NSObject, ObservableObject {
             logEvent("targetReached", detail: "counted")
             if notifyUser {
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
-                notify(title: "\(Format.km(runTargetKm)) km reached - apps unlocked",
-                       body: "Your steps check out. Note where you are.")
+                if AppLock.shared.isEnabled {
+                    notify(title: "Unlocked! Today's run is done",
+                           body: "\(AppSettings.shared.nemesis) is all yours. Keep going to bank minutes for another day.")
+                } else {
+                    notify(title: "\(Format.km(runTargetKm)) km reached - apps unlocked",
+                           body: "Your steps check out. Note where you are.")
+                }
             }
         }
         // GPS distance before the step check, logged for comparison.
@@ -447,6 +568,7 @@ final class RunTracker: NSObject, ObservableObject {
             status = .tracking
         }
         startMotion(from: runStart)
+        liveActivity.reattach()
     }
 
     // MARK: - Stride model (treadmill mode)

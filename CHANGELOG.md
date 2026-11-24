@@ -6,6 +6,29 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ### Added
 
+- Make a reel: a 10-second 1080 × 1920 video of a run, made on the phone (timing in `ReelTimeline`, with tests).
+- Time on apps as a receipt to screenshot: km paid this week against what the app time would cost at 15 minutes a km. A monthly Wrapped card from the Runs screen (`MonthWrap`, with tests).
+- Shoe mileage: kilometres per pair, credited once per run to the pair being worn, with a heads-up at 80% of the pair's limit and at the limit.
+- Run-only apps: a second set of apps, locked except while a run is going (their own shield store, with a monitor that locks them four hours on at the latest).
+- Plans for the lock: daily, weekly (running ahead earns days off) or a nine-week 5K plan with the voice coach calling the run and walk intervals; rest days in any plan. Rules in `RunPlan`, with tests.
+- Route maps: live during a run, on each run's details, and all runs together.
+- A voice coach with funny lines every 500 m, at halfway, near the end and at the unlock, in a choice of voices. Settings for the voice and the app you're running for.
+- "Nice try" cards (shareable) when the step check throws out distance.
+- Story-sized share card for each run.
+- Lock-screen and Dynamic Island countdown during a run (Live Activity).
+- The app lock (Screen Time), built on Tilawah Key's blocking:
+  - Pick apps to lock; they stay locked each day until you've run the daily target, then open until 4:00.
+  - A shield on locked apps saying how far away they are ("TikTok is 1.8 km away"), with a line that changes each minute. Run now opens Jog Lock (iOS 26.5+) or sends a notification that does.
+  - An unlock celebration.
+  - Banked minutes (15 a kilometre past the target, up to an hour), counted only while the locked apps are used, with a warning a minute before they run out.
+  - Borrowing 30 minutes from tomorrow for 1 km more tomorrow.
+  - While locked, apps can only be added and the lock can't be turned off.
+  - Websites are blocked in other browsers too (iOS's web filter).
+  - Websites typed in by name, for the ones the picker doesn't list (from Tilawah Key). Up to 40 in all; add-only while locked.
+  - Time on apps on the home screen, from Screen Time: a day on average this week against last week, what it would take to run for, and the apps used most. Drawn by a new Device Activity Report extension, JogLockReport; the app never sees the numbers.
+  - Shareable lock diagnostics in Settings.
+  - Rules in `LockLedger` and `LockState`, with tests; ADR-0005.
+- CI checks that each extension is built into the app with the right extension point and class. It checks the report extension in the app's Extensions folder too.
 - The step check (anti-cheat): only GPS distance backed by steps, and not covered in a car or on a bike, counts toward unlocking. Run logs now include step and motion lines, and the stop event and run summary record what counted and what didn't.
 - Motion & Fitness permission, with a warning when it's off.
 - Treadmill mode: distance from steps × a stride length learned on your outdoor runs (or the iPhone's own estimate until then), with the same car, bike and standing-still checks.
