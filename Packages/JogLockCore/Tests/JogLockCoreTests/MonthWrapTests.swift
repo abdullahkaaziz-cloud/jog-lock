@@ -76,7 +76,7 @@ struct MonthWrapTests {
 
     @Test("The receipt: what this week's app time would take to run for")
     func owed() {
-        let week = ScreenTimeWeek(usage: [.init(key: "a", name: "A", thisWeek: true, seconds: 300 * 60)],
+        let week = ScreenTimeWeek(usage: [.init(key: "a", name: "A", thisWeek: true, seconds: 18_000)],
                                   daysThisWeek: 3)
         #expect(week.owedMeters(minutesPerKm: 15) == 20_000)
         let tiny = ScreenTimeWeek(usage: [.init(key: "a", name: "A", thisWeek: true, seconds: 20)], daysThisWeek: 1)
