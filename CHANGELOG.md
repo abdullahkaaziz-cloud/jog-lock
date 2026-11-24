@@ -6,6 +6,7 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ### Added
 
+- Time on apps as a receipt to screenshot: km paid this week against what the app time would cost at 15 minutes a km. A monthly Wrapped card from the Runs screen (`MonthWrap`, with tests).
 - Shoe mileage: kilometres per pair, credited once per run to the pair being worn, with a heads-up at 80% of the pair's limit and at the limit.
 - Run-only apps: a second set of apps, locked except while a run is going (their own shield store, with a monitor that locks them four hours on at the latest).
 - Plans for the lock: daily, weekly (running ahead earns days off) or a nine-week 5K plan with the voice coach calling the run and walk intervals; rest days in any plan. Rules in `RunPlan`, with tests.

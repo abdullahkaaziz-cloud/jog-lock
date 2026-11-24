@@ -16,7 +16,6 @@ import FamilyControls
 import JogLockCore
 import ManagedSettings
 import SwiftUI
-import UIKit
 
 @main
 struct JogLockReportExtension: DeviceActivityReportExtension {
@@ -73,7 +72,7 @@ struct TimeOnAppsScene: DeviceActivityReportScene {
     }
 }
 
-/// The report, with Screen Time's own app icons, on the card's colour.
+/// The report, with Screen Time's own app icons, on the receipt's paper.
 struct TimeOnAppsExtensionView: View {
     let report: TimeOnApps
 
@@ -85,7 +84,8 @@ struct TimeOnAppsExtensionView: View {
                     .font(.title2)
             }
         }
-        .background(Color(uiColor: .secondarySystemBackground))
+        .background(Receipt.paper)
+        .environment(\.colorScheme, .light)
         // Nothing here to tap. iOS gives this process every touch over the
         // report, so taking none lets the home screen scroll under a finger
         // that starts on it (Tilawah Key, D95).

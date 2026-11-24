@@ -139,6 +139,14 @@ public struct ScreenTimeWeek: Equatable, Sendable {
             + "at \(Int(minutesPerKm.rounded())) min a km."
     }
 
+    /// The distance it would take to run for this week's time, at the rate
+    /// runs bank minutes. Nil under a minute.
+    public func owedMeters(minutesPerKm: Double) -> Double? {
+        let minutes = Self.minutes(total.thisWeek)
+        guard minutesPerKm > 0, minutes >= 1 else { return nil }
+        return Double(minutes) / minutesPerKm * 1_000
+    }
+
     // MARK: - Weeks and words
 
     /// Calendar weeks from the iPhone's first weekday, as Screen Time's

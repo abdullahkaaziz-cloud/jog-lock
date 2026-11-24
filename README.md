@@ -46,7 +46,7 @@ Tap **Choose apps to lock** on the home screen. iOS asks for Screen Time access 
   - **Rest days** in any plan are open all day. Distance owed from borrowing waits for the next run day. Like the target, a change starts tomorrow while the lock is on.
 - **Run-only apps.** Pick a podcast, music or audiobook app on the Run-only apps card. It stays locked except while a run is going: it opens when you start and locks again when you stop, or four hours on if Jog Lock isn't running by then. Its shield says "Spotify is for runs". You can change these apps any time; they're a treat for running, not the lock.
 - **Websites typed in by name.** For websites the picker doesn't list: ⋯ → **Websites**, then type `instagram.com` (or paste a whole address). They're blocked in Safari and other browsers, subdomains too, with iOS's own "Restricted" page. Up to 40 websites in all, chosen and typed; while locked they can only be added.
-- **Time on apps.** Once Screen Time is connected, a card at the bottom of the home screen shows a day on average this week against last week, what this week's time would take to run for (15 minutes a km), and the five apps used most. With the lock on it covers the locked apps; otherwise every app. A separate extension draws it, and iOS keeps the numbers inside that extension: Jog Lock never sees them.
+- **Time on apps.** Once Screen Time is connected, a receipt at the bottom of the home screen (made to be screenshotted, with what you've paid in km this week against what your app time would cost) shows a day on average this week against last week, what this week's time would take to run for (15 minutes a km), and the five apps used most. With the lock on it covers the locked apps; otherwise every app. A separate extension draws it, and iOS keeps the numbers inside that extension: Jog Lock never sees them.
 - **Diagnostics.** If something looks wrong, Settings → App lock → **Share lock diagnostics**. It shows what the lock did and when, never which apps you chose.
 
 It needs a paid Apple Developer team, because free Personal Teams can't use Family Controls. See [Put it on your iPhone](#put-it-on-your-iphone).
@@ -58,6 +58,7 @@ It needs a paid Apple Developer team, because free Personal Teams can't use Fami
 - **Nice try.** When the step check throws out distance (car, bike, or GPS distance without the steps), a "Nice try." card appears and the coach says so. The card can be shared.
 - **Lock-screen countdown.** During a run the lock screen and Dynamic Island show "0.8 km to TikTok", a progress bar and the time. It stays on the lock screen for 15 minutes after the run.
 - **Share card.** After a run, "Share this run" makes a story-sized image (1080 × 1920): your route as line art, the distance, time and pace.
+- **Your month.** On the Runs screen, the sparkles button wraps up a month as a story-sized card: kilometres run for your apps, runs, longest run, days in a row, the time of day you run most, Nice trys caught, the distance next to a marathon or the English Channel, and the scrolling it paid for at 15 minutes a km.
 - **Shoe mileage.** Add your pairs (home screen or Settings → Shoes). Each run's counted distance goes to the pair you're wearing, treadmill runs included. You get a notification at 80% of a pair's limit (650 km unless you change it; running shoes usually last 500–800 km) and at the limit.
 
 ## Treadmill mode
@@ -211,7 +212,8 @@ JogLockTracker/             the iPhone app
   RunOnlyCard.swift         apps that open only while you run
   ShoesView.swift           shoe mileage
   WebsitesView.swift        websites typed in by name
-  TimeOnAppsCard.swift      the Time on apps card (the report extension draws its numbers)
+  TimeOnAppsCard.swift      the Time on apps receipt (the report extension draws its numbers)
+  WrappedView.swift         your month, wrapped up to share
   UnlockCelebration.swift   the unlock moment
   StrideStore.swift         the learned stride samples, kept on the phone
   RunStore+Device.swift     where runs are saved on the phone

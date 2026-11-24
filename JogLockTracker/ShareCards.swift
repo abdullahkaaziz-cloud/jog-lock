@@ -149,7 +149,7 @@ enum ShareCards {
         render(NiceTryCardView(kind: kind, meters: meters))
     }
 
-    private static func render<V: View>(_ view: V) -> Image? {
+    static func render<V: View>(_ view: V) -> Image? {
         let renderer = ImageRenderer(content: view)
         renderer.scale = 3
         guard let image = renderer.uiImage else { return nil }

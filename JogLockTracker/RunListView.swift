@@ -8,6 +8,7 @@ import SwiftUI
 
 struct RunListView: View {
     @State private var runs: [RunSummary] = []
+    @State private var wrapping = false
 
     var body: some View {
         List {
@@ -29,12 +30,22 @@ struct RunListView: View {
         .navigationTitle("Runs")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    wrapping = true
+                } label: {
+                    Label("Your month", systemImage: "sparkles")
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink {
                     AllRunsMapView()
                 } label: {
                     Label("Map", systemImage: "map")
                 }
             }
+        }
+        .sheet(isPresented: $wrapping) {
+            WrappedView()
         }
         .onAppear { runs = RunStore.onDevice.allSummaries() }
     }
