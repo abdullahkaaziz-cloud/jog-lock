@@ -2,19 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleDisplayName</key>
-	<string>Jog Tracker</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Jog Tracker uses your location during a run to measure how far you have jogged.</string>
-	<key>NSMotionUsageDescription</key>
-	<string>Jog Tracker counts your steps to check the distance was covered on foot, not in a car or on a bike.</string>
 	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
 	<dict>
 		<key>RunDistance</key>
 		<string>Precise location is needed to measure your run distance accurately.</string>
 	</dict>
-	<key>NSSupportsLiveActivities</key>
-	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
@@ -22,10 +14,6 @@
 		<string>remote-notification</string>
 	</array>
 	<key>CKSharingSupported</key>
-	<true/>
-	<key>UIFileSharingEnabled</key>
-	<true/>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 </dict>
 </plist>
