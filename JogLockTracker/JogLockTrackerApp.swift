@@ -40,8 +40,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     }
 
     /// A lock buddy's day changed in iCloud: sync it, even in the background.
-    func application(_ application: UIApplication,
-                     didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
+    nonisolated func application(_ application: UIApplication,
+                                 didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
         guard CKNotification(fromRemoteNotificationDictionary: userInfo) != nil else { return .noData }
         await LockBuddies.shared.sync(reason: "push")
         return .newData
