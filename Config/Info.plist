@@ -13,10 +13,16 @@
 		<key>RunDistance</key>
 		<string>Precise location is needed to measure your run distance accurately.</string>
 	</dict>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
+		<string>audio</string>
 		<string>location</string>
+		<string>remote-notification</string>
 	</array>
+	<key>CKSharingSupported</key>
+	<true/>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
