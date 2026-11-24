@@ -17,6 +17,8 @@ struct AppLockCard: View {
     @State private var confirmBorrow = false
     @State private var confirmOff = false
     @State private var editingWebsites = false
+    @State private var showingBuddies = false
+    @ObservedObject private var buddies = LockBuddies.shared
 
     var body: some View {
         Group {
@@ -32,6 +34,10 @@ struct AppLockCard: View {
         .familyActivityPicker(isPresented: $picking, selection: $draft)
         .sheet(isPresented: $editingWebsites) {
             WebsitesView()
+                .environmentObject(lock)
+        }
+        .sheet(isPresented: $showingBuddies) {
+            BuddiesView()
                 .environmentObject(lock)
         }
         .onChange(of: picking) { _, isOpen in
@@ -61,6 +67,11 @@ struct AppLockCard: View {
 
     private var problemShown: Binding<Bool> {
         Binding(get: { lock.problem != nil }, set: { if !$0 { lock.problem = nil } })
+    }
+
+    private var buddyLine: String {
+        guard let buddy = buddies.buddy else { return "Lock buddy: waiting for them to join" }
+        return "With \(buddy.name): \(BuddiesView.progress(buddy, today: lock.today).lowercased())"
     }
 
     private func chooseApps() {
@@ -104,6 +115,16 @@ struct AppLockCard: View {
                 accessOff
             }
             LockedAppsRow(selection: lock.selection, websites: lock.websites)
+            if buddies.membership != nil {
+                Button {
+                    showingBuddies = true
+                } label: {
+                    Label(buddyLine, systemImage: "person.2.fill")
+                        .font(.footnote)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
             if ledger.owedMeters > 0 && !ledger.isTargetMet {
                 Text("Today's \(Format.shortDistance(ledger.targetMeters)) includes \(Format.shortDistance(ledger.owedMeters)) you borrowed.")
                     .font(.footnote)
@@ -144,6 +165,11 @@ struct AppLockCard: View {
                 editingWebsites = true
             } label: {
                 Label(lock.isLocked ? "Add websites" : "Websites", systemImage: "globe")
+            }
+            Button {
+                showingBuddies = true
+            } label: {
+                Label("Lock buddy", systemImage: "person.2.fill")
             }
             Button(role: .destructive) {
                 if lock.isLocked {

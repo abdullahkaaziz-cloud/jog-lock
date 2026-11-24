@@ -364,6 +364,34 @@ final class LockCycle {
         }
     }
 
+    // MARK: - Lock buddies
+
+    /// The team's mode once a buddy has joined; nil when there's no team.
+    /// A team never locks apps already open today. True if the apps opened.
+    func setTeam(_ team: TeamMode?) throws -> Bool {
+        let unlocked: Bool = try transaction { state in
+            guard state.rules.team != team else { return false }
+            state.rules.team = team
+            return state.enabled && state.ledger.buddyUpdated(nil, rules: state.rules, at: Date())
+        }
+        if unlocked {
+            try refresh()
+        }
+        return unlocked
+    }
+
+    /// A buddy's running today, synced from iCloud. True if it opened the apps.
+    func buddy(_ day: BuddyDay?) throws -> Bool {
+        let unlocked: Bool = try transaction { state in
+            let opened = state.ledger.buddyUpdated(day, rules: state.rules, at: Date())
+            return state.enabled && opened
+        }
+        if unlocked {
+            try refresh()
+        }
+        return unlocked
+    }
+
     // MARK: - Run-only apps
 
     /// Run-only apps chosen (nil: none).
@@ -434,6 +462,7 @@ final class LockCycle {
             "bank_min": ledger.bankMinutes, "spending": ledger.spending, "target_met": ledger.isTargetMet,
             "open": ledger.isOpen, "plan": state.rules.runPlan.kind.rawValue, "rest_day": ledger.isRestDay,
             "week_m": Int(ledger.weekMeters), "run_only": state.runOnly != nil, "run_open": state.runOpen != nil,
+            "team": state.rules.team?.rawValue ?? "none", "buddy_today": ledger.buddyToday != nil,
         ]
         if let monitor = ledger.monitor {
             entry["monitor"] = String(monitor.name.suffix(8))

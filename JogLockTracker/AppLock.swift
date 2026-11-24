@@ -26,6 +26,8 @@ private actor LockRuntime {
         case runOnly(Data?)
         case runStarted(String)
         case runEnded(String?)
+        case team(TeamMode?)
+        case buddy(BuddyDay?)
         case credit(String, Double, Date)
         case dailyMeters(Double)
 
@@ -43,6 +45,8 @@ private actor LockRuntime {
             case .runOnly: "run-only apps"
             case .runStarted: "run started"
             case .runEnded: "run ended"
+            case .team: "team"
+            case .buddy: "buddy"
             case .credit: "credit run"
             case .dailyMeters: "daily target"
             }
@@ -53,7 +57,7 @@ private actor LockRuntime {
         var showsErrors: Bool {
             switch self {
             case .turnOff, .spend, .stopSpending, .borrow, .choose, .websites, .plan, .runOnly: true
-            case .snapshot, .refresh, .credit, .dailyMeters, .runStarted, .runEnded: false
+            case .snapshot, .refresh, .credit, .dailyMeters, .runStarted, .runEnded, .team, .buddy: false
             }
         }
     }
@@ -93,6 +97,10 @@ private actor LockRuntime {
                 outcome.note = try cycle.runStarted(id)
             case .runEnded(let id):
                 try cycle.runEnded(id)
+            case .team(let team):
+                outcome.unlocked = try cycle.setTeam(team)
+            case .buddy(let day):
+                outcome.unlocked = try cycle.buddy(day)
             case .credit(let id, let meters, let time):
                 outcome.unlocked = try cycle.credit(run: id, countedMeters: meters, at: time)
             case .dailyMeters(let meters):
@@ -227,6 +235,7 @@ final class AppLock: ObservableObject {
             celebrating = true
         }
         log(command, trigger: trigger, outcome: outcome)
+        LockBuddies.shared.shareIfChanged()
         scheduleNextCheck()
     }
 
@@ -363,6 +372,28 @@ final class AppLock: ObservableObject {
         Task { await perform(.dailyMeters(km * 1_000), trigger: "daily target") }
     }
 
+    // MARK: - Lock buddies
+
+    /// What this phone shares with a lock buddy about today.
+    func myStatus(name: String) -> BuddyDay {
+        var ledger = state.ledger
+        ledger.update(to: Date(), rules: state.rules)
+        return ledger.status(name: name, at: Date())
+    }
+
+    /// The team as synced from iCloud: its mode once a buddy has joined
+    /// (nil without one), and the buddy's running today.
+    func teamSynced(mode: TeamMode?, buddy: BuddyDay?) {
+        Task {
+            if state.rules.team != mode {
+                await perform(.team(mode), trigger: "team synced")
+            }
+            if mode != nil {
+                await perform(.buddy(buddy), trigger: "buddy synced")
+            }
+        }
+    }
+
     // MARK: - Run-only apps
 
     var hasRunOnly: Bool {
@@ -441,7 +472,11 @@ final class AppLock: ObservableObject {
     func runTargetKm(default km: Double) -> Double {
         var ledger = state.ledger
         ledger.update(to: Date(), rules: state.rules)
-        if state.enabled, !ledger.isTargetMet, ledger.remainingMeters > 0 {
+        // Running for a buddy: what they still need from you.
+        if state.rules.team == .forEachOther, let buddy = ledger.buddyToday, buddy.target > ledger.ranMeters {
+            return (buddy.target - ledger.ranMeters) / 1_000
+        }
+        if state.enabled, state.rules.team != .forEachOther, !ledger.isTargetMet, ledger.remainingMeters > 0 {
             return ledger.remainingMeters / 1_000
         }
         // A weekly or 5K plan sets the distance; the setting is for daily ones.

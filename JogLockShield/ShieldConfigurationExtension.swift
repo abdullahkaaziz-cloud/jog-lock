@@ -41,7 +41,6 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         if let rules = state?.rules {
             state?.ledger.update(to: now, rules: rules)
         }
-        let ledger = state?.ledger
         let forRuns = state.map(runOnly) ?? false
         let green = UIColor.systemGreen
         let icon = UIImage(systemName: "figure.run",
@@ -54,11 +53,11 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
             icon: icon,
             title: ShieldConfiguration.Label(
                 text: forRuns ? ShieldText.runOnlyTitle(app: name)
-                    : ShieldText.title(app: name, remainingMeters: ledger?.remainingMeters ?? 0),
+                    : ShieldText.title(app: name, remainingMeters: state.map { $0.ledger.remainingMeters(rules: $0.rules) } ?? 0),
                 color: .white),
             subtitle: ShieldConfiguration.Label(
                 text: forRuns ? ShieldText.runOnlySubtitle
-                    : ledger.map { ShieldText.subtitle($0, at: now) } ?? ShieldText.line(at: now),
+                    : state.map { ShieldText.subtitle($0.ledger, rules: $0.rules, at: now) } ?? ShieldText.line(at: now),
                 color: UIColor(white: 0.85, alpha: 1)),
             primaryButtonLabel: ShieldConfiguration.Label(text: ShieldText.button, color: .black),
             primaryButtonBackgroundColor: green,

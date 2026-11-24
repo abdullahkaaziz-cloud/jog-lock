@@ -104,6 +104,9 @@ struct ContentView: View {
             }
             .onChange(of: scenePhase, initial: true) { _, phase in
                 lock.setActive(phase == .active)
+                if phase == .active {
+                    Task { await LockBuddies.shared.sync(reason: "open") }
+                }
             }
             .confirmationDialog("Stop this run?", isPresented: $confirmStop, titleVisibility: .visible) {
                 Button("Stop and save", role: .destructive) { tracker.stop() }

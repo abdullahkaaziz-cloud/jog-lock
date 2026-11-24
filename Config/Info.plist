@@ -19,7 +19,10 @@
 	<array>
 		<string>audio</string>
 		<string>location</string>
+		<string>remote-notification</string>
 	</array>
+	<key>CKSharingSupported</key>
+	<true/>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

@@ -75,6 +75,8 @@ public struct LockRules: Codable, Equatable, Sendable {
     /// Rest days, a weekly target or the 5K plan. Nil (as saved before plans
     /// existed): the daily distance every day.
     public var plan: RunPlan?
+    /// Lock buddies: how a buddy's running counts. Nil: no team.
+    public var team: TeamMode?
 
     /// iOS monitors no interval under 15 minutes, so a day ending sooner is
     /// monitored this long. The app ends it on time whenever it's open.
@@ -92,7 +94,8 @@ public struct LockRules: Codable, Equatable, Sendable {
                 maxOwedMeters: Double = 3_000,
                 borrowBelowMinutes: Double = 15,
                 dayStartHour: Int = 4,
-                plan: RunPlan? = nil) {
+                plan: RunPlan? = nil,
+                team: TeamMode? = nil) {
         self.dailyMeters = dailyMeters
         self.minutesPerExtraKm = minutesPerExtraKm
         self.maxBankMinutes = maxBankMinutes
@@ -102,6 +105,7 @@ public struct LockRules: Codable, Equatable, Sendable {
         self.borrowBelowMinutes = borrowBelowMinutes
         self.dayStartHour = dayStartHour
         self.plan = plan
+        self.team = team
     }
 
     /// The plan in force: a daily one when none was set.
@@ -207,6 +211,8 @@ public struct LockLedger: Codable, Equatable, Sendable {
     private var week: WeekTally?
     /// Distance today past which runs bank minutes; nil: the target.
     private var bankAfter: Double?
+    /// A lock buddy's running, as last shared.
+    private var buddy: BuddyDay?
 
     public init(day: LockDay, rules: LockRules) {
         self.day = day
@@ -224,6 +230,42 @@ public struct LockLedger: Codable, Equatable, Sendable {
 
     public var isRestDay: Bool {
         restDay ?? false
+    }
+
+    /// A lock buddy's running today; nil if what they last shared was another day.
+    public var buddyToday: BuddyDay? {
+        buddy?.day == day ? buddy : nil
+    }
+
+    /// Whether today's running opens the apps: yours, and with a team your
+    /// buddy's too. A rest day is always open.
+    public func unlockDue(rules: LockRules) -> Bool {
+        if isRestDay {
+            return true
+        }
+        switch rules.team {
+        case nil:
+            return ranMeters >= targetMeters
+        case .together:
+            return ranMeters >= targetMeters && buddyToday?.met == true
+        case .forEachOther:
+            return (buddyToday?.meters ?? 0) >= targetMeters
+        }
+    }
+
+    /// A buddy's running arrived, or the team changed: the apps open if
+    /// that's what's now due. A team never locks apps already open today.
+    /// True if they just opened.
+    @discardableResult
+    public mutating func buddyUpdated(_ update: BuddyDay?, rules: LockRules, at now: Date) -> Bool {
+        if let update {
+            buddy = update
+        }
+        guard unlockedAt == nil, unlockDue(rules: rules) else { return false }
+        unlockedAt = now
+        spending = false
+        bankExtra(rules: rules)
+        return true
     }
 
     /// Counted distance this week, today's included.
@@ -330,7 +372,7 @@ public struct LockLedger: Codable, Equatable, Sendable {
         restDay = rest
         targetMeters = rest ? 0 : plan.target(on: day, dailyMeters: rules.dailyMeters, weekBefore: before) + owedMeters
         bankAfter = plan.bankAfter(target: targetMeters, owed: rest ? 0 : owedMeters, on: day, weekBefore: before)
-        if unlockedAt == nil && ranMeters >= targetMeters {
+        if unlockedAt == nil && unlockDue(rules: rules) {
             unlockedAt = now
             spending = false
         }
@@ -346,22 +388,27 @@ public struct LockLedger: Codable, Equatable, Sendable {
         runs[id] = today
 
         var justUnlocked = false
-        if unlockedAt == nil && ranMeters >= targetMeters {
+        if unlockedAt == nil && unlockDue(rules: rules) {
             unlockedAt = now
             spending = false    // the whole day is open; minutes left stay banked
             justUnlocked = true
         }
         if unlockedAt != nil {
-            let extra = ranMeters - (bankAfter ?? targetMeters)
-            if extra > bankedMeters {
-                let earned = (extra - bankedMeters) / 1_000 * rules.minutesPerExtraKm
-                if bankMinutes < rules.maxBankMinutes {
-                    bankMinutes = min(rules.maxBankMinutes, bankMinutes + earned)
-                }
-                bankedMeters = extra
-            }
+            bankExtra(rules: rules)
         }
         return justUnlocked
+    }
+
+    /// Banks minutes for distance past the target (past the week, for a
+    /// weekly plan), up to the most that can be banked.
+    private mutating func bankExtra(rules: LockRules) {
+        let extra = ranMeters - (bankAfter ?? targetMeters)
+        guard extra > bankedMeters else { return }
+        let earned = (extra - bankedMeters) / 1_000 * rules.minutesPerExtraKm
+        if bankMinutes < rules.maxBankMinutes {
+            bankMinutes = min(rules.maxBankMinutes, bankMinutes + earned)
+        }
+        bankedMeters = extra
     }
 
     // MARK: - Banked minutes and borrowing

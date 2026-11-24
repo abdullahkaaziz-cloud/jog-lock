@@ -6,6 +6,7 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ### Added
 
+- Lock buddies over iCloud: Together (both run, then both open) or For each other (your buddy's running opens your apps). Rules in core (`TeamMode`, `BuddyDay`), with tests; syncing with CloudKit and silent pushes, no server.
 - Make a reel: a 10-second 1080 × 1920 video of a run, made on the phone (timing in `ReelTimeline`, with tests).
 - Time on apps as a receipt to screenshot: km paid this week against what the app time would cost at 15 minutes a km. A monthly Wrapped card from the Runs screen (`MonthWrap`, with tests).
 - Shoe mileage: kilometres per pair, credited once per run to the pair being worn, with a heads-up at 80% of the pair's limit and at the limit.

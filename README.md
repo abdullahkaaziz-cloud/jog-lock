@@ -44,6 +44,11 @@ Tap **Choose apps to lock** on the home screen. iOS asks for Screen Time access 
   - **Weekly:** a week's distance shared over your run days. Run more one day and the next days need less; finish the week and the rest of it is open. A missed day isn't added to the next, and minutes bank only past the week's distance.
   - **5K plan:** nine weeks of three runs, from 1 km of running and walking to 5 km without stopping. Each run starts with a 3-minute walk, and the voice coach calls every run and walk.
   - **Rest days** in any plan are open all day. Distance owed from borrowing waits for the next run day. Like the target, a change starts tomorrow while the lock is on.
+- **Lock buddy** (⋯ → Lock buddy). Make a team and send the invite link; your buddy taps it and joins.
+  - **Together:** you both run your own distance, and your apps open once you've both done it.
+  - **For each other:** your apps open when your buddy has run your distance, and your running opens theirs.
+  - The team counts only once your buddy has joined. Joining or leaving never locks apps already open today.
+  - It runs on iCloud (CloudKit): a zone in the inviter's private iCloud, shared with the buddy. Each phone shares a first name and today's distance, and a silent push tells the other phone. There's no Jog Lock server.
 - **Run-only apps.** Pick a podcast, music or audiobook app on the Run-only apps card. It stays locked except while a run is going: it opens when you start and locks again when you stop, or four hours on if Jog Lock isn't running by then. Its shield says "Spotify is for runs". You can change these apps any time; they're a treat for running, not the lock.
 - **Websites typed in by name.** For websites the picker doesn't list: ⋯ → **Websites**, then type `instagram.com` (or paste a whole address). They're blocked in Safari and other browsers, subdomains too, with iOS's own "Restricted" page. Up to 40 websites in all, chosen and typed; while locked they can only be added.
 - **Time on apps.** Once Screen Time is connected, a receipt at the bottom of the home screen (made to be screenshotted, with what you've paid in km this week against what your app time would cost) shows a day on average this week against last week, what this week's time would take to run for (15 minutes a km), and the five apps used most. With the lock on it covers the locked apps; otherwise every app. A separate extension draws it, and iOS keeps the numbers inside that extension: Jog Lock never sees them.
@@ -79,6 +84,7 @@ You need Xcode 16 or later (Xcode 26 is fine) and an iPhone on iOS 18 or later.
 
 1. Open `JogLockTracker.xcodeproj`.
 2. Signing is automatic, with the team already set in the project.
+   - **Lock buddies need iCloud.** If **Signing & Capabilities** for JogLockTracker shows an iCloud error, open the **iCloud** capability, tick **CloudKit**, add the container `iCloud.com.abdullahaziz.JogLockTracker` with **+** if it isn't listed, and click **Try Again**.
    - **Another team?** Pick it in **Signing & Capabilities** for each of the six targets: JogLockTracker, JogLockWidgets, JogLockMonitor, JogLockShield, JogLockShieldAction and JogLockReport.
    - **The team must be paid.** Free Personal Teams can't use Family Controls, which the app lock needs.
    - **The first build registers things.** Xcode registers the four extensions' bundle IDs, the App Group and the Family Controls (Development) capability. If a target shows a signing error, select it and click **Try Again** in Signing & Capabilities.
@@ -213,6 +219,8 @@ JogLockTracker/             the iPhone app
   RunOnlyCard.swift         apps that open only while you run
   ShoesView.swift           shoe mileage
   WebsitesView.swift        websites typed in by name
+  LockBuddies.swift         lock buddies over iCloud (CloudKit)
+  BuddiesView.swift         make, join and leave a lock buddies team
   TimeOnAppsCard.swift      the Time on apps receipt (the report extension draws its numbers)
   WrappedView.swift         your month, wrapped up to share
   RunReel.swift             a run as a 10-second story video
