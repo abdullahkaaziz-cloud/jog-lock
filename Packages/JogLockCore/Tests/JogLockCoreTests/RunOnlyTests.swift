@@ -16,12 +16,15 @@ struct RunOnlyTests {
     func openAndClose() {
         var state = Self.state()
         #expect(!state.runOnlyOpen(at: Self.start))
-        #expect(state.openRunOnly(run: "a", monitor: "m1", at: Self.start) == nil)
+        let replaced = state.openRunOnly(run: "a", monitor: "m1", at: Self.start)
+        #expect(replaced == nil)
         #expect(state.runOnlyOpen(at: Self.start.addingTimeInterval(60)))
         // Another run's end leaves them open; this run's end locks them.
-        #expect(state.closeRunOnly(run: "b") == nil)
+        let other = state.closeRunOnly(run: "b")
+        #expect(other == nil)
         #expect(state.runOnlyOpen(at: Self.start.addingTimeInterval(60)))
-        #expect(state.closeRunOnly(run: "a")?.monitor == "m1")
+        let closed = state.closeRunOnly(run: "a")
+        #expect(closed?.monitor == "m1")
         #expect(!state.runOnlyOpen(at: Self.start.addingTimeInterval(60)))
     }
 
@@ -29,7 +32,8 @@ struct RunOnlyTests {
     func closeAny() {
         var state = Self.state()
         _ = state.openRunOnly(run: "a", monitor: "m1", at: Self.start)
-        #expect(state.closeRunOnly(run: nil)?.run == "a")
+        let closed = state.closeRunOnly(run: nil)
+        #expect(closed?.run == "a")
         #expect(state.runOpen == nil)
     }
 
@@ -38,9 +42,11 @@ struct RunOnlyTests {
         var state = Self.state()
         _ = state.openRunOnly(run: "a", monitor: "m1", at: Self.start)
         let later = Self.start.addingTimeInterval(LockState.longestRun)
-        #expect(!state.expireRunWindow(at: later.addingTimeInterval(-1)))
+        let early = state.expireRunWindow(at: later.addingTimeInterval(-1))
+        #expect(!early)
         #expect(!state.runOnlyOpen(at: later))
-        #expect(state.expireRunWindow(at: later))
+        let expired = state.expireRunWindow(at: later)
+        #expect(expired)
         #expect(state.runOpen == nil)
     }
 
@@ -48,10 +54,13 @@ struct RunOnlyTests {
     func monitors() {
         var state = Self.state()
         _ = state.openRunOnly(run: "a", monitor: "m1", at: Self.start)
-        #expect(state.openRunOnly(run: "b", monitor: "m2", at: Self.start)?.monitor == "m1")
-        #expect(!state.runMonitorEnded("m1"))
+        let replaced = state.openRunOnly(run: "b", monitor: "m2", at: Self.start)
+        #expect(replaced?.monitor == "m1")
+        let oldEnded = state.runMonitorEnded("m1")
+        #expect(!oldEnded)
         #expect(state.runOnlyOpen(at: Self.start))
-        #expect(state.runMonitorEnded("m2"))
+        let currentEnded = state.runMonitorEnded("m2")
+        #expect(currentEnded)
         #expect(!state.runOnlyOpen(at: Self.start))
     }
 
