@@ -10,6 +10,17 @@ struct FormatTests {
         #expect(Format.km(0) == "0.00")
     }
 
+    @Test("Short distances read like a label: 1.8 km, 2 km, 750 m")
+    func shortDistance() {
+        #expect(Format.shortDistance(1_800) == "1.8 km")
+        #expect(Format.shortDistance(2_000) == "2 km")
+        #expect(Format.shortDistance(1_049) == "1 km")
+        #expect(Format.shortDistance(950) == "1 km")
+        #expect(Format.shortDistance(944) == "940 m")
+        #expect(Format.shortDistance(3) == "10 m")
+        #expect(Format.shortDistance(-5) == "10 m")
+    }
+
     @Test("Durations are m:ss, or h:mm:ss from an hour")
     func duration() {
         #expect(Format.duration(0) == "0:00")

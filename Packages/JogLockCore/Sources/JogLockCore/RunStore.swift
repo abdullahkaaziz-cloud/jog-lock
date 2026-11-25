@@ -8,7 +8,7 @@
 //    track.gpx     made on demand for sharing
 //
 //  The app uses Documents/Runs as the root, which is also visible in the
-//  Files app (On My iPhone > Jog Tracker). Tests use a temporary folder.
+//  Files app (On My iPhone > Jog Lock). Tests use a temporary folder.
 //
 
 import Foundation

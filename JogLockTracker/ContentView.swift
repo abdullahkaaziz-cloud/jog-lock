@@ -8,7 +8,10 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var tracker: RunTracker
+    @EnvironmentObject private var lock: AppLock
+    @Environment(\.scenePhase) private var scenePhase
     @State private var confirmStop = false
+    @State private var showSettings = false
 
     var body: some View {
         NavigationStack {
@@ -24,17 +27,33 @@ struct ContentView: View {
                     if let diagnostic = tracker.diagnostic {
                         Banner(text: diagnostic, systemImage: "location.slash.fill", tint: .red, onClose: nil)
                     }
+                    if let niceTry = tracker.niceTry {
+                        NiceTryBanner(kind: niceTry.kind, meters: niceTry.meters) {
+                            tracker.clearNiceTry()
+                        }
+                    }
 
-                    DistanceRing(meters: tracker.gateTotals.countedMeters + tracker.gateTotals.pendingMeters,
-                                 targetKm: tracker.isActive ? tracker.runTargetKm : tracker.targetKm,
-                                 reached: tracker.countedTargetReached && tracker.isActive)
+                    let ring = ringValues
+                    DistanceRing(meters: ring.meters, targetKm: ring.targetKm, reached: ring.reached)
+                    if !tracker.isActive {
+                        AppLockCard()
+                    }
+                    if !tracker.isActive || lock.hasRunOnly {
+                        RunOnlyCard()
+                    }
 
                     statsRow
+                    if tracker.isActive && tracker.runMode == .outdoor {
+                        RouteMap(segments: tracker.route, followsUser: true)
+                            .frame(height: 220)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                    }
                     comparisonCard
 
                     if !tracker.isActive {
                         modePicker
-                        targetStepper
+                        PlanCard(targetKm: $tracker.targetKm)
+                        ShoesRow()
                         if tracker.mode == .treadmill {
                             treadmillCard
                         }
@@ -44,6 +63,12 @@ struct ContentView: View {
 
                     if !tracker.isActive, let run = tracker.lastFinishedRun {
                         lastRunCard(run)
+                        ShareRunButton(run: run)
+                        ReelButton(run: run)
+                    }
+
+                    if !tracker.isActive && lock.isAuthorized {
+                        TimeOnAppsCard()
                     }
 
                     if !tracker.isActive {
@@ -52,14 +77,35 @@ struct ContentView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Jog Tracker")
+            .navigationTitle("Jog Lock")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
                         RunListView()
                     } label: {
                         Label("Runs", systemImage: "list.bullet")
                     }
+                }
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
+            }
+            .fullScreenCover(isPresented: $lock.celebrating) {
+                UnlockCelebrationView(selection: lock.selection, app: AppSettings.shared.nemesis) {
+                    lock.celebrating = false
+                }
+            }
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                lock.setActive(phase == .active)
+                if phase == .active {
+                    Task { await LockBuddies.shared.sync(reason: "open") }
                 }
             }
             .confirmationDialog("Stop this run?", isPresented: $confirmStop, titleVisibility: .visible) {
@@ -70,6 +116,20 @@ struct ContentView: View {
     }
 
     // MARK: - Pieces
+
+    /// During a run: this run against what it needs. Otherwise, with the
+    /// lock on: today's running against today's target.
+    private var ringValues: (meters: Double, targetKm: Double, reached: Bool) {
+        let live = tracker.gateTotals.countedMeters + tracker.gateTotals.pendingMeters
+        if tracker.isActive {
+            return (live, tracker.runTargetKm, tracker.countedTargetReached)
+        }
+        if lock.isEnabled {
+            let ledger = lock.ledger
+            return (ledger.ranMeters, ledger.targetMeters / 1_000, ledger.isTargetMet)
+        }
+        return (live, tracker.targetKm, false)
+    }
 
     private var statusPill: some View {
         HStack(spacing: 8) {
@@ -176,20 +236,6 @@ struct ContentView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-    }
-
-    private var targetStepper: some View {
-        Stepper(value: $tracker.targetKm, in: 0.25...20, step: 0.25) {
-            HStack {
-                Label("Unlock target", systemImage: "lock.fill")
-                Spacer()
-                Text("\(Format.km(tracker.targetKm)) km")
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding()
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 
@@ -448,4 +494,5 @@ struct Banner: View {
 #Preview {
     ContentView()
         .environmentObject(RunTracker.shared)
+        .environmentObject(AppLock.shared)
 }
