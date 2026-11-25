@@ -1,13 +1,14 @@
 //
-//  ContentView.swift
+//  LiveRunView.swift
 //  JogLockTracker
 //
 
 import JogLockCore
 import SwiftUI
 
-struct ContentView: View {
+struct LiveRunView: View {
     @EnvironmentObject private var tracker: RunTracker
+    @EnvironmentObject private var lock: AppLock
     @State private var confirmStop = false
 
     var body: some View {
@@ -24,44 +25,31 @@ struct ContentView: View {
                     if let diagnostic = tracker.diagnostic {
                         Banner(text: diagnostic, systemImage: "location.slash.fill", tint: .red, onClose: nil)
                     }
-
-                    DistanceRing(meters: tracker.gateTotals.countedMeters + tracker.gateTotals.pendingMeters,
-                                 targetKm: tracker.isActive ? tracker.runTargetKm : tracker.targetKm,
-                                 reached: tracker.countedTargetReached && tracker.isActive)
-
-                    statsRow
-                    comparisonCard
-
-                    if !tracker.isActive {
-                        modePicker
-                        targetStepper
-                        if tracker.mode == .treadmill {
-                            treadmillCard
+                    if let niceTry = tracker.niceTry {
+                        NiceTryBanner(kind: niceTry.kind, meters: niceTry.meters) {
+                            tracker.clearNiceTry()
                         }
                     }
 
-                    controlButton
-
-                    if !tracker.isActive, let run = tracker.lastFinishedRun {
-                        lastRunCard(run)
+                    let ring = ringValues
+                    DistanceRing(meters: ring.meters, targetKm: ring.targetKm, reached: ring.reached)
+                    if tracker.isActive && lock.hasRunOnly {
+                        RunOnlyCard()
                     }
 
-                    if !tracker.isActive {
-                        howToCard
+                    statsRow
+                    if tracker.isActive && tracker.runMode == .outdoor {
+                        RouteMap(segments: tracker.route, followsUser: true)
+                            .frame(height: 220)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
                     }
+                    comparisonCard
+                    stopButton
                 }
                 .padding()
             }
-            .navigationTitle("Jog Tracker")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink {
-                        RunListView()
-                    } label: {
-                        Label("Runs", systemImage: "list.bullet")
-                    }
-                }
-            }
+            .navigationTitle("Today")
+            .jlScreen()
             .confirmationDialog("Stop this run?", isPresented: $confirmStop, titleVisibility: .visible) {
                 Button("Stop and save", role: .destructive) { tracker.stop() }
                 Button("Keep going", role: .cancel) {}
@@ -70,6 +58,20 @@ struct ContentView: View {
     }
 
     // MARK: - Pieces
+
+    /// During a run: this run against what it needs. Otherwise, with the
+    /// lock on: today's running against today's target.
+    private var ringValues: (meters: Double, targetKm: Double, reached: Bool) {
+        let live = tracker.gateTotals.countedMeters + tracker.gateTotals.pendingMeters
+        if tracker.isActive {
+            return (live, tracker.runTargetKm, tracker.countedTargetReached)
+        }
+        if lock.isEnabled {
+            let ledger = lock.ledger
+            return (ledger.ranMeters, ledger.targetMeters / 1_000, ledger.isTargetMet)
+        }
+        return (live, tracker.targetKm, false)
+    }
 
     private var statusPill: some View {
         HStack(spacing: 8) {
@@ -179,125 +181,17 @@ struct ContentView: View {
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 
-    private var targetStepper: some View {
-        Stepper(value: $tracker.targetKm, in: 0.25...20, step: 0.25) {
-            HStack {
-                Label("Unlock target", systemImage: "lock.fill")
-                Spacer()
-                Text("\(Format.km(tracker.targetKm)) km")
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding()
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-    }
-
-    @ViewBuilder
-    private var controlButton: some View {
-        if tracker.isActive {
-            Button(role: .destructive) {
-                confirmStop = true
-            } label: {
-                Label("Stop", systemImage: "stop.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
-            .controlSize(.large)
-        } else {
-            Button {
-                tracker.start()
-            } label: {
-                Label("Start run", systemImage: "figure.run")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-        }
-    }
-
-    private func lastRunCard(_ run: RunSummary) -> some View {
-        NavigationLink {
-            RunDetailView(run: run)
+    private var stopButton: some View {
+        Button(role: .destructive) {
+            confirmStop = true
         } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Last run")
-                        .font(.headline)
-                    Text(Self.lastRunLine(run))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                    Text("Add Strava's distance and share the files")
-                        .font(.footnote)
-                        .foregroundStyle(Color.accentColor)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .foregroundStyle(.tertiary)
-            }
-            .padding()
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        }
-        .buttonStyle(.plain)
-    }
-
-    static func lastRunLine(_ run: RunSummary) -> String {
-        if run.mode == .treadmill {
-            return "\(Format.km((run.countedMeters ?? 0) / 1000)) km counted · treadmill"
-        }
-        guard let counted = run.countedMeters else {
-            return "\(Format.km(run.cleanMeters / 1000)) km cleaned · \(Format.km(run.rawMeters / 1000)) raw"
-        }
-        return "\(Format.km(counted / 1000)) km counted · \(Format.km(run.cleanMeters / 1000)) km GPS"
-    }
-
-    private var modePicker: some View {
-        Picker("Where", selection: $tracker.mode) {
-            Text("Outdoor (GPS)").tag(RunMode.outdoor)
-            Text("Treadmill").tag(RunMode.treadmill)
-        }
-        .pickerStyle(.segmented)
-    }
-
-    private var treadmillCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label("Keep the phone on you", systemImage: "figure.run")
+            Label("Stop", systemImage: "stop.fill")
                 .font(.headline)
-            Text("Put it in a pocket or an armband. On the treadmill's console it can't count your steps.")
-            Text(strideText)
+                .frame(maxWidth: .infinity)
         }
-        .font(.footnote)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-    }
-
-    private var strideText: String {
-        guard let model = tracker.strideModel else {
-            return "Distance comes from the iPhone's own step estimate until you've done an outdoor run with Jog Lock. Then it uses your own stride."
-        }
-        let typical = (model.minCadence + model.maxCadence) / 2
-        let length = model.stepLength(cadence: typical)
-        return "Your stride, learned on GPS runs: \(String(format: "%.2f", length)) m a step at \(Int((typical * 60).rounded())) steps a minute."
-    }
-
-    private var howToCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Test run")
-                .font(.headline)
-            Text("1. Tap Start at your start point and wait for \"GPS ready\".")
-            Text("2. Start Strava too, then run. Lock the phone as usual.")
-            Text("3. Stop both at the same spot, then add Strava's distance to the run.")
-        }
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .buttonStyle(.borderedProminent)
+        .tint(.red)
+        .controlSize(.large)
     }
 
     // MARK: - Formatting
@@ -446,6 +340,7 @@ struct Banner: View {
 }
 
 #Preview {
-    ContentView()
+    LiveRunView()
         .environmentObject(RunTracker.shared)
+        .environmentObject(AppLock.shared)
 }
