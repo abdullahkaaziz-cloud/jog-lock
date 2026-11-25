@@ -23,6 +23,8 @@ struct JogLockTrackerApp: App {
             ContentView()
                 .environmentObject(tracker)
                 .environmentObject(lock)
+                .tint(JL.red)
+                .preferredColorScheme(.light)
         }
     }
 }

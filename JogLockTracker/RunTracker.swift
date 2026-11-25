@@ -208,7 +208,7 @@ final class RunTracker: NSObject, ObservableObject {
         if newMode == .outdoor {
             guard await ensureLocationAuthorization() else {
                 status = .idle
-                warning = "Location access is off. Allow it in Settings > Privacy & Security > Location Services > Jog Tracker."
+                warning = "Location access is off. Allow it in Settings > Privacy & Security > Location Services > Jog Lock."
                 return
             }
             guard status == .requestingPermission else { return } // stopped while asking
@@ -217,7 +217,7 @@ final class RunTracker: NSObject, ObservableObject {
                 try? await manager.requestTemporaryFullAccuracyAuthorization(withPurposeKey: "RunDistance")
             }
             if manager.accuracyAuthorization == .reducedAccuracy {
-                warning = "Precise Location is off, so distances will be wrong. Turn it on in Settings > Jog Tracker > Location."
+                warning = "Precise Location is off, so distances will be wrong. Turn it on in Settings > Jog Lock > Location."
             }
         }
         _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
@@ -427,7 +427,7 @@ final class RunTracker: NSObject, ObservableObject {
     private func noteDiagnostics(_ update: CLLocationUpdate) {
         var message: String?
         if update.authorizationDenied || update.authorizationDeniedGlobally {
-            message = "Location access is off for Jog Tracker."
+            message = "Location access is off for Jog Lock."
         } else if update.insufficientlyInUse {
             message = "iOS paused location for this app. Open it to carry on."
         } else if update.locationUnavailable {

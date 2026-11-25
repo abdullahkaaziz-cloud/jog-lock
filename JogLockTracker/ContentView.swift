@@ -77,7 +77,7 @@ struct ContentView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Jog Tracker")
+            .navigationTitle("Jog Lock")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {

@@ -6,6 +6,7 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ### Added
 
+- Race Day · Track design, step 1: Archivo cut into three fonts (`Tools/fonts/make_fonts.py`), the colours, the buttons, cards and list rows, and the running track that shows progress (`TrackGeometry`, with tests). Plan and status in `docs/design/BUILD-PLAN.md`.
 - Lock buddies over iCloud: Together (both run, then both open) or For each other (your buddy's running opens your apps). Rules in core (`TeamMode`, `BuddyDay`), with tests; syncing with CloudKit and silent pushes, no server.
 - Make a reel: a 10-second 1080 × 1920 video of a run, made on the phone (timing in `ReelTimeline`, with tests).
 - Time on apps as a receipt to screenshot: km paid this week against what the app time would cost at 15 minutes a km. A monthly Wrapped card from the Runs screen (`MonthWrap`, with tests).
@@ -44,6 +45,7 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ### Changed
 
+- The app is called Jog Lock on the home screen, has a light look only, and its accent is track red.
 - iOS 18 or later is required (same iPhones as iOS 17). This removes a deprecated location API.
 - The speed-based distance is no longer shown or notified. It is still logged for comparison.
 - The distance engine, run log formats and run files moved into a local Swift package, `JogLockCore`. The app links it. No change in behaviour.

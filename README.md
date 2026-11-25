@@ -106,14 +106,14 @@ Background location and the permission texts are already set up in `Config/Info.
 3. Lock the phone, carry it the way you normally would, and go.
 4. When **"1.00 km reached"** pops up, note where you are, for example "about 10 m before the 2.5-lap line".
 5. Optional: stand still for about a minute halfway round. This tests whether distance builds up while you aren't moving.
-6. Finish at a known point, and stop Strava and Jog Tracker there.
-7. In Jog Tracker, open **Last run**:
+6. Finish at a known point, and stop Strava and Jog Lock there.
+7. In Jog Lock, open **Last run**:
    - Type in Strava's distance and the true distance, then tap **Save**.
    - Tap **Share run files** and AirDrop them to your Mac, or save them to Files.
 
 Send me `raw.jsonl` and `summary.json`, and I'll analyse the run.
 
-The run files are also in the Files app, under **On My iPhone > Jog Tracker > Runs**.
+The run files are also in the Files app, under **On My iPhone > Jog Lock > Runs**.
 
 ## Analyse a run on your Mac
 

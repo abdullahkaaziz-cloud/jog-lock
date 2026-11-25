@@ -101,3 +101,16 @@ jobs:
           type=$(plutil -extract CFBundlePackageType raw "$plist")
           [ "$type" = 'XPC!' ] || { echo "::error::JogLockReport has package type $type, expected XPC!"; exit 1; }
           echo "JogLockReport: $point $type"
+      # The design's fonts load by name: if a file is missing from the app or
+      # from UIAppFonts, iOS quietly falls back to the system font.
+      - name: Check the fonts inside the app
+        run: |
+          app=DerivedData/Build/Products/Debug-iphoneos/JogLockTracker.app
+          fonts=$(plutil -extract UIAppFonts json -o - "$app/Info.plist")
+          for font in ArchivoTrack-Display ArchivoTrack-DisplayItalic ArchivoTrack-Heading; do
+            test -f "$app/$font.ttf" || { echo "::error::$font.ttf is missing from the app"; ls "$app"; exit 1; }
+            echo "$fonts" | grep -q "\"$font.ttf\"" || { echo "::error::$font.ttf is not in UIAppFonts"; exit 1; }
+            echo "$font: ok"
+          done
+          style=$(plutil -extract UIUserInterfaceStyle raw "$app/Info.plist")
+          [ "$style" = Light ] || { echo "::error::UIUserInterfaceStyle is $style, expected Light"; exit 1; }
