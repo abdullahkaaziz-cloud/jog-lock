@@ -8,6 +8,7 @@ import SwiftUI
 
 struct RunListView: View {
     @State private var runs: [RunSummary] = []
+    @State private var wrapping = false
 
     var body: some View {
         List {
@@ -27,6 +28,25 @@ struct RunListView: View {
             }
         }
         .navigationTitle("Runs")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    wrapping = true
+                } label: {
+                    Label("Your month", systemImage: "sparkles")
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    AllRunsMapView()
+                } label: {
+                    Label("Map", systemImage: "map")
+                }
+            }
+        }
+        .sheet(isPresented: $wrapping) {
+            WrappedView()
+        }
         .onAppear { runs = RunStore.onDevice.allSummaries() }
     }
 }
@@ -38,7 +58,7 @@ struct RunRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(run.startedAt.formatted(date: .abbreviated, time: .shortened))
                 .font(.headline)
-            Text(ContentView.lastRunLine(run))
+            Text(run.distanceLine)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
@@ -61,6 +81,7 @@ struct RunDetailView: View {
     @State private var shareURLs: [URL] = []
     @State private var saved = false
     @State private var confirmDelete = false
+    @State private var segments: [[Coordinate]] = []
 
     init(run: RunSummary) {
         _run = State(initialValue: run)
@@ -69,8 +90,38 @@ struct RunDetailView: View {
         _noteText = State(initialValue: run.note ?? "")
     }
 
+    private var rejectedMeters: (kind: NiceTryKind, meters: Double)? {
+        let vehicle = run.vehicleMeters ?? run.rejectedMeters ?? 0
+        let noSteps = run.noStepsMeters ?? 0
+        if vehicle >= 100 && vehicle >= noSteps {
+            return (.vehicle, vehicle)
+        }
+        return noSteps >= 100 ? (.noSteps, noSteps) : nil
+    }
+
     var body: some View {
         Form {
+            if !segments.isEmpty {
+                Section {
+                    RouteMap(segments: segments)
+                        .frame(height: 220)
+                        .listRowInsets(EdgeInsets())
+                }
+            }
+            Section {
+                ShareRunButton(run: run)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                ReelButton(run: run)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+            }
+            if let rejected = rejectedMeters {
+                Section {
+                    NiceTryBanner(kind: rejected.kind, meters: rejected.meters, onClose: nil)
+                        .listRowInsets(EdgeInsets())
+                }
+            }
             Section("Distance") {
                 if run.mode == .treadmill {
                     distanceRow("Counted (treadmill)", run.countedMeters ?? 0)
@@ -144,6 +195,12 @@ struct RunDetailView: View {
             }
         }
         .navigationTitle(run.startedAt.formatted(date: .abbreviated, time: .shortened))
+        .task(id: run.id) {
+            let id = run.id
+            segments = await Task.detached(priority: .userInitiated) {
+                Route.segments(from: RunStore.onDevice.readLines(id: id))
+            }.value
+        }
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { shareURLs = RunStore.onDevice.shareableFiles(for: run.id) }
         .onChange(of: stravaText) { saved = false }
@@ -202,5 +259,18 @@ struct RunDetailView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard let value = Double(cleaned), value > 0 else { return nil }
         return value
+    }
+}
+
+extension RunSummary {
+    /// The distances of a run in one line: "2.41 km counted · 2.47 km GPS".
+    var distanceLine: String {
+        if mode == .treadmill {
+            return "\(Format.km((countedMeters ?? 0) / 1000)) km counted · treadmill"
+        }
+        guard let counted = countedMeters else {
+            return "\(Format.km(cleanMeters / 1000)) km cleaned · \(Format.km(rawMeters / 1000)) raw"
+        }
+        return "\(Format.km(counted / 1000)) km counted · \(Format.km(cleanMeters / 1000)) km GPS"
     }
 }
