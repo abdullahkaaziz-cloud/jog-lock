@@ -47,6 +47,8 @@ struct TrackView<Center: View>: View {
         case rest
         /// The lock can't work (Screen Time access is off): grey progress.
         case paused
+        /// Run and walk intervals: an ink infield, progress as usual.
+        case intervals
     }
 
     /// How far round, 0...1.
@@ -98,7 +100,7 @@ struct TrackView<Center: View>: View {
 
     private var laneColor: Color {
         switch style {
-        case .track, .done: return JL.red
+        case .track, .done, .intervals: return JL.red
         case .rest, .paused: return JL.restLane
         }
     }
@@ -106,7 +108,7 @@ struct TrackView<Center: View>: View {
     private var infieldColor: Color {
         switch style {
         case .track: return JL.infield
-        case .done: return JL.ink
+        case .done, .intervals: return JL.ink
         case .rest, .paused: return Color(hex: 0xEDE7DB)
         }
     }

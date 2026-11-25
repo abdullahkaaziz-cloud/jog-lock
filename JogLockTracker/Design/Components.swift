@@ -155,10 +155,11 @@ struct AppTiles: View {
     let selection: FamilyActivitySelection
     var size: CGFloat = 28
     var border: Color = JL.card
+    var limit = 3
 
     var body: some View {
         HStack(spacing: -size * 0.25) {
-            ForEach(Array(ChosenToken.all(selection).prefix(3).enumerated()), id: \.offset) { _, token in
+            ForEach(Array(ChosenToken.all(selection).prefix(limit).enumerated()), id: \.offset) { _, token in
                 token.icon
                     .frame(width: size, height: size)
                     .background(JL.sand)

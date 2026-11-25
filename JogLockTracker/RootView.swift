@@ -22,11 +22,7 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $tab) {
             Tab("Today", systemImage: "capsule", value: AppTab.today) {
-                if tracker.isActive {
-                    LiveRunView()
-                } else {
-                    TodayView { tab = .lock }
-                }
+                TodayView { tab = .lock }
             }
             Tab("Runs", systemImage: "chart.bar", value: AppTab.runs) {
                 NavigationStack {
@@ -40,7 +36,12 @@ struct RootView: View {
                 SettingsView(showsDone: false)
             }
         }
-        .fullScreenCover(isPresented: $lock.celebrating) {
+        .fullScreenCover(isPresented: running) {
+            LiveRunView()
+                .environmentObject(tracker)
+                .environmentObject(lock)
+        }
+        .fullScreenCover(isPresented: celebrating) {
             UnlockCelebrationView(selection: lock.selection, app: AppSettings.shared.nemesis) {
                 lock.celebrating = false
             }
@@ -56,6 +57,16 @@ struct RootView: View {
                 Task { await LockBuddies.shared.sync(reason: "open") }
             }
         }
+    }
+
+    /// A run in progress covers the tabs until it's saved.
+    private var running: Binding<Bool> {
+        Binding(get: { tracker.isActive }, set: { _ in })
+    }
+
+    /// The unlock moment. During a run the run screen shows it.
+    private var celebrating: Binding<Bool> {
+        Binding(get: { lock.celebrating && !tracker.isActive }, set: { lock.celebrating = $0 })
     }
 
     /// A lock action that failed, from any tab.

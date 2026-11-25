@@ -6,6 +6,7 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ### Added
 
+- Race Day · Track design, step 4: the run in progress fills the screen, with the track standing up and what's left to unlock, km run, pace, steps and the last km (`KmSplits`, with tests). 5K plan runs show the run or walk under way with a countdown and the phases round it. The treadmill gets its tips, "Nice try" is a sheet with a card to share, the route opens as a map, the voice coach switches on and off, and a run finishes by holding the button.
 - Race Day · Track design, steps 2 and 3: four tabs (Today, Runs, Lock, Settings), and Today rebuilt round the track: what's left to run or Unlocked, the chosen apps (names and icons drawn by iOS), the week's bars, Outdoor or Treadmill and Start, banked minutes and borrowing, and your lock buddy. Rest days and a lock paused by Screen Time have their own looks (`TodayWeek`, with tests).
 - Race Day · Track design, step 1: Archivo cut into three fonts (`Tools/fonts/make_fonts.py`), the colours, the buttons, cards and list rows, and the running track that shows progress (`TrackGeometry`, with tests). Plan and status in `docs/design/BUILD-PLAN.md`.
 - Lock buddies over iCloud: Together (both run, then both open) or For each other (your buddy's running opens your apps). Rules in core (`TeamMode`, `BuddyDay`), with tests; syncing with CloudKit and silent pushes, no server.

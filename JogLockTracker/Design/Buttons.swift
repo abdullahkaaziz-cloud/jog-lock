@@ -83,15 +83,17 @@ struct JLSmallButtonStyle: ButtonStyle {
     }
 }
 
-/// A round 44-point button: back, close, more.
+/// A round button: back, close, more (44 points), and the run screen's
+/// voice and map buttons (58).
 struct JLRoundButtonStyle: ButtonStyle {
     var fill: Color = JL.sand
+    var size: CGFloat = 44
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.body.weight(.semibold))
+            .font(size > 50 ? .title3.weight(.semibold) : .body.weight(.semibold))
             .foregroundStyle(JL.ink)
-            .frame(width: 44, height: 44)
+            .frame(width: size, height: size)
             .background(fill, in: Circle())
             .opacity(configuration.isPressed ? 0.7 : 1)
     }
