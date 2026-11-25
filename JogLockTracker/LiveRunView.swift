@@ -1,12 +1,12 @@
 //
-//  ContentView.swift
+//  LiveRunView.swift
 //  JogLockTracker
 //
 
 import JogLockCore
 import SwiftUI
 
-struct ContentView: View {
+struct LiveRunView: View {
     @EnvironmentObject private var tracker: RunTracker
     @EnvironmentObject private var lock: AppLock
     @State private var confirmStop = false
@@ -235,7 +235,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Last run")
                         .font(.headline)
-                    Text(Self.lastRunLine(run))
+                    Text(run.distanceLine)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -251,16 +251,6 @@ struct ContentView: View {
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
-    }
-
-    static func lastRunLine(_ run: RunSummary) -> String {
-        if run.mode == .treadmill {
-            return "\(Format.km((run.countedMeters ?? 0) / 1000)) km counted · treadmill"
-        }
-        guard let counted = run.countedMeters else {
-            return "\(Format.km(run.cleanMeters / 1000)) km cleaned · \(Format.km(run.rawMeters / 1000)) raw"
-        }
-        return "\(Format.km(counted / 1000)) km counted · \(Format.km(run.cleanMeters / 1000)) km GPS"
     }
 
     private var modePicker: some View {
@@ -454,7 +444,7 @@ struct Banner: View {
 }
 
 #Preview {
-    ContentView()
+    LiveRunView()
         .environmentObject(RunTracker.shared)
         .environmentObject(AppLock.shared)
 }

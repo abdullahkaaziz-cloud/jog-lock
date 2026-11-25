@@ -22,7 +22,7 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $tab) {
             Tab("Today", systemImage: "capsule", value: AppTab.today) {
-                ContentView()
+                LiveRunView()
             }
             Tab("Runs", systemImage: "chart.bar", value: AppTab.runs) {
                 NavigationStack {

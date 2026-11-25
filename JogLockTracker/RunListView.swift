@@ -58,7 +58,7 @@ struct RunRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(run.startedAt.formatted(date: .abbreviated, time: .shortened))
                 .font(.headline)
-            Text(ContentView.lastRunLine(run))
+            Text(run.distanceLine)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
@@ -259,5 +259,18 @@ struct RunDetailView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard let value = Double(cleaned), value > 0 else { return nil }
         return value
+    }
+}
+
+extension RunSummary {
+    /// The distances of a run in one line: "2.41 km counted · 2.47 km GPS".
+    var distanceLine: String {
+        if mode == .treadmill {
+            return "\(Format.km((countedMeters ?? 0) / 1000)) km counted · treadmill"
+        }
+        guard let counted = countedMeters else {
+            return "\(Format.km(cleanMeters / 1000)) km cleaned · \(Format.km(rawMeters / 1000)) raw"
+        }
+        return "\(Format.km(counted / 1000)) km counted · \(Format.km(cleanMeters / 1000)) km GPS"
     }
 }
