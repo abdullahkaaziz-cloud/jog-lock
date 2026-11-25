@@ -59,6 +59,8 @@ final class RunTracker: NSObject, ObservableObject {
     @Published private(set) var route: [[Coordinate]] = []
     /// Set when the step check has just thrown out distance ("nice try").
     @Published private(set) var niceTry: NiceTryEvent?
+    /// How long the last whole counted kilometre took, without stops.
+    @Published private(set) var lastKmSeconds: Double?
 
     /// True from tapping Start until the run is stopped.
     var isActive: Bool { status != .idle }
@@ -76,6 +78,7 @@ final class RunTracker: NSObject, ObservableObject {
     private var counter = RunCounter(start: 0)
     private var routeBuilder = RouteBuilder()
     private var coach = VoiceCoachPlanner()
+    private var splits = KmSplits()
     private var coachVariant = 0
     private var intervalCoach: IntervalCoach?
     private var intervalVariant = 0
@@ -258,6 +261,8 @@ final class RunTracker: NSObject, ObservableObject {
         route = []
         coach = VoiceCoachPlanner()
         niceTryDetector = NiceTryDetector()
+        splits = KmSplits()
+        lastKmSeconds = nil
         niceTry = nil
         startedAt = now
         countedTargetReached = false
@@ -449,6 +454,10 @@ final class RunTracker: NSObject, ObservableObject {
         if let runID {
             AppLock.shared.credit(run: runID, countedMeters: gateTotals.countedMeters, at: time)
         }
+        splits.add(meters: gateTotals.countedMeters, at: splitClock(at: time))
+        if splits.last != lastKmSeconds {
+            lastKmSeconds = splits.last
+        }
         if let event = niceTryDetector.check(gateTotals, at: time.timeIntervalSince1970) {
             niceTry = event
             logEvent("niceTry", detail: event.kind.rawValue)
@@ -460,6 +469,15 @@ final class RunTracker: NSObject, ObservableObject {
         }
         liveActivity.update(meters: live, targetMeters: runTargetKm * 1000,
                             unlocked: countedTargetReached, paused: status == .paused)
+    }
+
+    /// The clock km splits are timed on: GPS moving time outdoors, so stops
+    /// don't count, and time since the start on a treadmill.
+    private func splitClock(at time: Date) -> Double {
+        if runMode == .treadmill {
+            return time.timeIntervalSince(startedAt ?? time)
+        }
+        return snapshot.movingSeconds
     }
 
     private func say(_ cue: VoiceCue) {
@@ -550,6 +568,8 @@ final class RunTracker: NSObject, ObservableObject {
         speedTargetReached = speedTargetAt != nil
         snapshot = counter.engine.snapshot
         gateTotals = treadmill?.totals ?? counter.gate.totals
+        splits = KmSplits(resumingAt: gateTotals.countedMeters, time: splitClock(at: Date()))
+        lastKmSeconds = nil
         runID = id
         writer = try? RunLogWriter(url: RunStore.onDevice.rawLogURL(for: id))
 
