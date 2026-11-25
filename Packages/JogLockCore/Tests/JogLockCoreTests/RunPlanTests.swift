@@ -190,4 +190,33 @@ struct RunPlanTests {
         #expect(ledger.weekMeters == 1_500)
         #expect(ledger.targetMeters == 1_000)
     }
+
+    @Test("The 5K plan's phases, numbered: the warm-up, then runs and walks")
+    func spans() throws {
+        let week3 = FiveKWeek.all[2]                    // run 2 min, walk 2 min
+        #expect(week3.spanIndex(at: 179) == 0)
+        #expect(week3.spanIndex(at: 180) == 1)
+        #expect(week3.spanIndex(at: 300) == 2)
+        #expect(week3.span(2) == FiveKWeek.Span(phase: .walk, start: 300, length: 120, number: 1))
+        #expect(week3.span(3) == FiveKWeek.Span(phase: .run, start: 420, length: 120, number: 2))
+        #expect(week3.span(0).length == 180)
+
+        let week9 = try #require(FiveKWeek.all.last)    // the whole way
+        #expect(week9.spanIndex(at: 500) == 1)
+        #expect(week9.span(1) == FiveKWeek.Span(phase: .runAllTheWay, start: 180, length: nil, number: 1))
+        #expect(week9.span(5) == week9.span(1))
+    }
+
+    @Test("Numbered phases agree with the phase at any moment")
+    func spansMatchPhases() {
+        for week in FiveKWeek.all {
+            for elapsed in stride(from: 0.0, through: 3_600, by: 7) {
+                let span = week.span(week.spanIndex(at: elapsed))
+                let phase = week.phase(at: elapsed)
+                #expect(span.phase == phase.phase)
+                #expect(span.start == phase.start)
+                #expect(span.length == phase.length)
+            }
+        }
+    }
 }

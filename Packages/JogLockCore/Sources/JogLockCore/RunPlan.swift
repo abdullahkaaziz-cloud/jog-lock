@@ -166,6 +166,46 @@ public struct FiveKWeek: Equatable, Sendable {
         return (.walk, cycleStart + TimeInterval(runSeconds), TimeInterval(walkSeconds))
     }
 
+    /// One phase of a run on the plan: the warm-up, a run or a walk.
+    public struct Span: Equatable, Sendable {
+        public let phase: Phase
+        public let start: TimeInterval
+        /// Nil: until the run ends.
+        public let length: TimeInterval?
+        /// Which run or walk it is, from 1. The warm-up is 0.
+        public let number: Int
+    }
+
+    /// The phases in order, from 0: the warm-up, run 1, walk 1, run 2, and
+    /// so on. A week run the whole way has the warm-up, then one run.
+    public func span(_ index: Int) -> Span {
+        let warmUp = TimeInterval(Self.warmUpSeconds)
+        if index <= 0 {
+            return Span(phase: .warmUp, start: 0, length: warmUp, number: 0)
+        }
+        guard runSeconds > 0 else {
+            return Span(phase: .runAllTheWay, start: warmUp, length: nil, number: 1)
+        }
+        let cycle = TimeInterval(runSeconds + walkSeconds)
+        let done = (index - 1) / 2
+        let isRun = (index - 1) % 2 == 0
+        let start = warmUp + TimeInterval(done) * cycle + (isRun ? 0 : TimeInterval(runSeconds))
+        return Span(phase: isRun ? .run : .walk, start: start,
+                    length: TimeInterval(isRun ? runSeconds : walkSeconds), number: done + 1)
+    }
+
+    /// The index `span(_:)` gives the phase `elapsed` seconds into a run.
+    public func spanIndex(at elapsed: TimeInterval) -> Int {
+        let warmUp = TimeInterval(Self.warmUpSeconds)
+        guard elapsed >= warmUp else { return 0 }
+        guard runSeconds > 0 else { return 1 }
+        let cycle = TimeInterval(runSeconds + walkSeconds)
+        let into = elapsed - warmUp
+        let done = Int((into / cycle).rounded(.down))
+        let inCycle = into - TimeInterval(done) * cycle
+        return 1 + 2 * done + (inCycle < TimeInterval(runSeconds) ? 0 : 1)
+    }
+
     /// "Run 2 min, walk 2 min", or "Run the whole way".
     public var intervalsText: String {
         guard runSeconds > 0 else { return "Run the whole way" }
