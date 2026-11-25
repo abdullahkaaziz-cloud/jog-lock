@@ -11,8 +11,8 @@ tests and the unsigned iOS build) is green before the next step starts.
 |---|------|--------|--------|
 | 1 | Foundation: fonts, colours, buttons, the track, light look | `design/1-foundation` | done (#20) |
 | 2 | Four-tab shell: Today, Runs, Lock, Settings | `design/2-tabs` | done (#21) |
-| 3 | Today: track hero and its states, start row, chips, buddy | `design/3-today` | in progress |
-| 4 | Live run: tall track, intervals, treadmill, Nice try, hold to finish | `design/4-live-run` | to do |
+| 3 | Today: track hero and its states, start row, chips, buddy | `design/3-today` | done (#22) |
+| 4 | Live run: tall track, intervals, treadmill, Nice try, hold to finish | `design/4-live-run` | in progress |
 | 5 | After the run: unlocked, summary, share card styles, reel | `design/5-after-run` | to do |
 | 6 | Runs: month view, run detail, your month | `design/6-runs` | to do |
 | 7 | Lock: lock tab, websites, borrow sheet, buddy, time on apps | `design/7-lock` | to do |
