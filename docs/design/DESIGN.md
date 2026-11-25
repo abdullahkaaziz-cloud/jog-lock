@@ -42,7 +42,8 @@ A stadium: red lanes with two thin white lane lines, an infield, and your
 progress drawn in ink round the inner lane, clockwise from the white
 start/finish line, with a runner dot at the head. Horizontal on Today, tall
 during a run. Styles: `track` (red), `done` (full loop, ink infield),
-`rest` (sand, dashed lines), `paused` (sand, grey progress). The geometry
+`rest` (sand, dashed lines), `paused` (sand, grey progress), `intervals`
+(ink infield, progress as usual, for the 5K plan's runs and walks). The geometry
 (`TrackGeometry` in JogLockCore) is tested on Linux.
 
 ## Components (`JogLockTracker/Design/`)
@@ -53,6 +54,15 @@ during a run. Styles: `track` (red), `done` (full loop, ink infield),
   from Screen Time), `WeekBars`.
 - Tab bar, toolbars and sheets are the system ones: Liquid Glass on iOS 26 and
   later, the classic look on iOS 18.
+
+## After a run
+
+The run screen covers the tabs until the run is saved. A run that unlocked
+the apps then shows the unlock moment (red, UNLOCKED in italics, the run's
+day, distance and time), otherwise its summary: the route on a muted map,
+how it was counted, the shoes, Share card and Make a reel. Share cards come
+in three styles, Track, Route and Receipt; the reel is drawn on a paper map
+and only opens the lock if the run met its target.
 
 ## Behaviour the design adds
 

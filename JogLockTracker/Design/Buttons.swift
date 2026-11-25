@@ -26,18 +26,30 @@ struct JLInkButtonStyle: ButtonStyle {
     }
 }
 
-/// A quiet action: an ink outline, normal text. "Outdoor", "Run anyway".
+/// The way out of the red unlock screen: a paper pill, ink capitals.
+/// "LET ME SCROLL".
+struct JLPaperButtonStyle: ButtonStyle {
+    var height: CGFloat = 58
+
+    func makeBody(configuration: Configuration) -> some View {
+        JLPill(configuration: configuration, height: height, fill: JL.card, text: JL.ink, capitals: true)
+    }
+}
+
+/// A quiet action: an outline, normal text. "Outdoor", "Run anyway". Ink on
+/// paper; paper on red for "Share the run".
 struct JLOutlineButtonStyle: ButtonStyle {
     var height: CGFloat = 58
     var fullWidth = false
+    var color: Color = JL.ink
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(JL.ink)
+            .foregroundStyle(color)
             .padding(.horizontal, 16)
             .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: height)
-            .overlay(Capsule().strokeBorder(JL.ink, lineWidth: 1.5))
+            .overlay(Capsule().strokeBorder(color.opacity(0.9), lineWidth: 1.5))
             .contentShape(Capsule())
             .opacity(configuration.isPressed ? 0.6 : 1)
     }

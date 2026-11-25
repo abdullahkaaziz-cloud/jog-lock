@@ -6,6 +6,7 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ### Added
 
+- Race Day · Track design, step 5: after a run, the unlock moment in track red when it opened the apps, otherwise the run's summary (route, how it was counted, shoes, share and reel). Share cards in three styles (Track, Route, Receipt) with Save to Photos, and the reel redrawn on a paper map; its lock only opens if the run met its target.
 - Race Day · Track design, step 4: the run in progress fills the screen, with the track standing up and what's left to unlock, km run, pace, steps and the last km (`KmSplits`, with tests). 5K plan runs show the run or walk under way with a countdown and the phases round it. The treadmill gets its tips, "Nice try" is a sheet with a card to share, the route opens as a map, the voice coach switches on and off, and a run finishes by holding the button.
 - Race Day · Track design, steps 2 and 3: four tabs (Today, Runs, Lock, Settings), and Today rebuilt round the track: what's left to run or Unlocked, the chosen apps (names and icons drawn by iOS), the week's bars, Outdoor or Treadmill and Start, banked minutes and borrowing, and your lock buddy. Rest days and a lock paused by Screen Time have their own looks (`TodayWeek`, with tests).
 - Race Day · Track design, step 1: Archivo cut into three fonts (`Tools/fonts/make_fonts.py`), the colours, the buttons, cards and list rows, and the running track that shows progress (`TrackGeometry`, with tests). Plan and status in `docs/design/BUILD-PLAN.md`.
@@ -47,6 +48,7 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ### Changed
 
+- The unlock moment comes after the run is saved, with the run's distance and time, instead of in the middle of it.
 - The steps for testing a run against Strava moved to Settings.
 - The app is called Jog Lock on the home screen, has a light look only, and its accent is track red.
 - iOS 18 or later is required (same iPhones as iOS 17). This removes a deprecated location API.

@@ -46,11 +46,6 @@ struct LiveRunView: View {
                 }
             }
         }
-        .fullScreenCover(isPresented: $lock.celebrating) {
-            UnlockCelebrationView(selection: lock.selection, app: settings.nemesis) {
-                lock.celebrating = false
-            }
-        }
     }
 
     // MARK: - What's shown
