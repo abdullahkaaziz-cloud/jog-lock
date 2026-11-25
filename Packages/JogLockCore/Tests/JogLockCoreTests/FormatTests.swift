@@ -33,6 +33,14 @@ struct FormatTests {
         #expect(Format.partOfDay(hour: 4) == "Tonight")
     }
 
+    @Test("A run's name from when it started")
+    func runTitle() {
+        #expect(Format.runTitle(hour: 7) == "Morning run")
+        #expect(Format.runTitle(hour: 13) == "Afternoon run")
+        #expect(Format.runTitle(hour: 18) == "Evening run")
+        #expect(Format.runTitle(hour: 2) == "Night run")
+    }
+
     @Test("Short distances read like a label: 1.8 km, 2 km, 750 m")
     func shortDistance() {
         #expect(Format.shortDistance(1_800) == "1.8 km")

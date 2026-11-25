@@ -47,6 +47,16 @@ public enum Format {
         }
     }
 
+    /// A run's name from when it started: "Morning run".
+    public static func runTitle(hour: Int) -> String {
+        switch hour {
+        case 5..<12: "Morning run"
+        case 12..<17: "Afternoon run"
+        case 17..<22: "Evening run"
+        default: "Night run"
+        }
+    }
+
     public static func duration(_ seconds: Double) -> String {
         guard seconds.isFinite, seconds >= 0 else { return "--" }
         let total = Int(seconds.rounded())
