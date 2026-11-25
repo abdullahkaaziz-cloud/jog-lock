@@ -58,15 +58,6 @@ struct AppLockCard: View {
         } message: {
             Text("Your apps open straight away. Banked minutes and borrowed distance are kept.")
         }
-        .alert("App lock", isPresented: problemShown) {
-            Button("OK") { lock.problem = nil }
-        } message: {
-            Text(lock.problem ?? "")
-        }
-    }
-
-    private var problemShown: Binding<Bool> {
-        Binding(get: { lock.problem != nil }, set: { if !$0 { lock.problem = nil } })
     }
 
     private var buddyLine: String {

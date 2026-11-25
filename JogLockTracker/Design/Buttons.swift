@@ -47,12 +47,23 @@ struct JLOutlineButtonStyle: ButtonStyle {
 /// The label's first line is the headline, the rest is secondary.
 struct JLChipButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
+        JLChip(configuration: configuration)
+    }
+}
+
+/// A sand chip, dimmed when the button is disabled.
+private struct JLChip: View {
+    let configuration: ButtonStyleConfiguration
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
         configuration.label
             .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
             .padding(.horizontal, 14)
             .foregroundStyle(JL.ink)
             .background(JL.sand, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .opacity(configuration.isPressed ? 0.7 : 1)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.45)
     }
 }
 

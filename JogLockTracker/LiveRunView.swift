@@ -44,27 +44,7 @@ struct LiveRunView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                     }
                     comparisonCard
-
-                    if !tracker.isActive {
-                        modePicker
-                        PlanCard(targetKm: $tracker.targetKm)
-                        ShoesRow()
-                        if tracker.mode == .treadmill {
-                            treadmillCard
-                        }
-                    }
-
-                    controlButton
-
-                    if !tracker.isActive, let run = tracker.lastFinishedRun {
-                        lastRunCard(run)
-                        ShareRunButton(run: run)
-                        ReelButton(run: run)
-                    }
-
-                    if !tracker.isActive {
-                        howToCard
-                    }
+                    stopButton
                 }
                 .padding()
             }
@@ -201,101 +181,17 @@ struct LiveRunView: View {
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 
-    @ViewBuilder
-    private var controlButton: some View {
-        if tracker.isActive {
-            Button(role: .destructive) {
-                confirmStop = true
-            } label: {
-                Label("Stop", systemImage: "stop.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
-            .controlSize(.large)
-        } else {
-            Button {
-                tracker.start()
-            } label: {
-                Label("Start run", systemImage: "figure.run")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-        }
-    }
-
-    private func lastRunCard(_ run: RunSummary) -> some View {
-        NavigationLink {
-            RunDetailView(run: run)
+    private var stopButton: some View {
+        Button(role: .destructive) {
+            confirmStop = true
         } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Last run")
-                        .font(.headline)
-                    Text(run.distanceLine)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                    Text("Add Strava's distance and share the files")
-                        .font(.footnote)
-                        .foregroundStyle(Color.accentColor)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .foregroundStyle(.tertiary)
-            }
-            .padding()
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var modePicker: some View {
-        Picker("Where", selection: $tracker.mode) {
-            Text("Outdoor (GPS)").tag(RunMode.outdoor)
-            Text("Treadmill").tag(RunMode.treadmill)
-        }
-        .pickerStyle(.segmented)
-    }
-
-    private var treadmillCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label("Keep the phone on you", systemImage: "figure.run")
+            Label("Stop", systemImage: "stop.fill")
                 .font(.headline)
-            Text("Put it in a pocket or an armband. On the treadmill's console it can't count your steps.")
-            Text(strideText)
+                .frame(maxWidth: .infinity)
         }
-        .font(.footnote)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-    }
-
-    private var strideText: String {
-        guard let model = tracker.strideModel else {
-            return "Distance comes from the iPhone's own step estimate until you've done an outdoor run with Jog Lock. Then it uses your own stride."
-        }
-        let typical = (model.minCadence + model.maxCadence) / 2
-        let length = model.stepLength(cadence: typical)
-        return "Your stride, learned on GPS runs: \(String(format: "%.2f", length)) m a step at \(Int((typical * 60).rounded())) steps a minute."
-    }
-
-    private var howToCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Test run")
-                .font(.headline)
-            Text("1. Tap Start at your start point and wait for \"GPS ready\".")
-            Text("2. Start Strava too, then run. Lock the phone as usual.")
-            Text("3. Stop both at the same spot, then add Strava's distance to the run.")
-        }
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .buttonStyle(.borderedProminent)
+        .tint(.red)
+        .controlSize(.large)
     }
 
     // MARK: - Formatting

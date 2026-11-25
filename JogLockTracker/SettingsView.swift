@@ -51,6 +51,14 @@ struct SettingsView: View {
                 } footer: {
                     Text("Kilometres on each pair, with a heads-up when they're getting tired.")
                 }
+                Section("Testing a run against Strava") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("1. Tap Start run at your start point and wait for the GPS to be ready.")
+                        Text("2. Start Strava too, then run. Lock the phone as usual.")
+                        Text("3. Stop both at the same spot, then open the run in Runs and add Strava's distance.")
+                    }
+                    .font(.footnote)
+                }
                 Section {
                     DisclosureGroup("Make the lock harder to switch off") {
                         VStack(alignment: .leading, spacing: 8) {

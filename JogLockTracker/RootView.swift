@@ -22,7 +22,11 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $tab) {
             Tab("Today", systemImage: "capsule", value: AppTab.today) {
-                LiveRunView()
+                if tracker.isActive {
+                    LiveRunView()
+                } else {
+                    TodayView { tab = .lock }
+                }
             }
             Tab("Runs", systemImage: "chart.bar", value: AppTab.runs) {
                 NavigationStack {
@@ -41,12 +45,22 @@ struct RootView: View {
                 lock.celebrating = false
             }
         }
+        .alert("App lock", isPresented: problemShown) {
+            Button("OK") { lock.problem = nil }
+        } message: {
+            Text(lock.problem ?? "")
+        }
         .onChange(of: scenePhase, initial: true) { _, phase in
             lock.setActive(phase == .active)
             if phase == .active {
                 Task { await LockBuddies.shared.sync(reason: "open") }
             }
         }
+    }
+
+    /// A lock action that failed, from any tab.
+    private var problemShown: Binding<Bool> {
+        Binding(get: { lock.problem != nil }, set: { if !$0 { lock.problem = nil } })
     }
 }
 

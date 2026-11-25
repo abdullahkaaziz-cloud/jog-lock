@@ -6,6 +6,7 @@
 //
 
 import FamilyControls
+import JogLockCore
 import ManagedSettings
 import SwiftUI
 
@@ -107,6 +108,47 @@ extension JLListRow where Leading == EmptyView {
     }
 }
 
+/// Something chosen in Screen Time's picker: an app, a category or a website.
+enum ChosenToken {
+    case app(ApplicationToken)
+    case category(ActivityCategoryToken)
+    case web(WebDomainToken)
+
+    /// Apps first, then categories, then websites. Each kind in an order that
+    /// stays the same between launches, which a set's order doesn't.
+    static func all(_ selection: FamilyActivitySelection) -> [ChosenToken] {
+        steady(selection.applicationTokens).map(ChosenToken.app)
+            + steady(selection.categoryTokens).map(ChosenToken.category)
+            + steady(selection.webDomainTokens).map(ChosenToken.web)
+    }
+
+    private static func steady<T: Encodable & Hashable>(_ tokens: Set<T>) -> [T] {
+        let encoder = JSONEncoder()
+        return tokens
+            .map { (token: $0, key: (try? encoder.encode($0))?.base64EncodedString() ?? "") }
+            .sorted { $0.key < $1.key }
+            .map(\.token)
+    }
+
+    /// Its icon, drawn by iOS.
+    @ViewBuilder var icon: some View {
+        switch self {
+        case let .app(token): Label(token).labelStyle(.iconOnly)
+        case let .category(token): Label(token).labelStyle(.iconOnly)
+        case let .web(token): Label(token).labelStyle(.iconOnly)
+        }
+    }
+
+    /// Its name, drawn by iOS.
+    @ViewBuilder var name: some View {
+        switch self {
+        case let .app(token): Label(token).labelStyle(.titleOnly)
+        case let .category(token): Label(token).labelStyle(.titleOnly)
+        case let .web(token): Label(token).labelStyle(.titleOnly)
+        }
+    }
+}
+
 /// The icons of up to three chosen apps, overlapping, from Screen Time.
 /// Jog Lock never learns which apps they are: iOS draws them.
 struct AppTiles: View {
@@ -116,39 +158,102 @@ struct AppTiles: View {
 
     var body: some View {
         HStack(spacing: -size * 0.25) {
-            ForEach(Array(tokens.enumerated()), id: \.offset) { _, token in
-                tile(token)
+            ForEach(Array(ChosenToken.all(selection).prefix(3).enumerated()), id: \.offset) { _, token in
+                token.icon
+                    .frame(width: size, height: size)
+                    .background(JL.sand)
+                    .clipShape(RoundedRectangle(cornerRadius: size * 0.25, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: size * 0.25, style: .continuous).stroke(border, lineWidth: 2))
             }
         }
         .accessibilityHidden(true)
     }
+}
 
-    private enum Token {
-        case app(ApplicationToken)
-        case category(ActivityCategoryToken)
-        case web(WebDomainToken)
+/// The chosen apps' names as iOS draws them, then how many more:
+/// "TikTok, Instagram +3". Websites typed in count too.
+struct AppNames: View {
+    let selection: FamilyActivitySelection
+    var websites: [String] = []
+    var shown = 2
+
+    private enum Name {
+        case token(ChosenToken)
+        case site(String)
     }
 
-    private var tokens: [Token] {
-        let apps = selection.applicationTokens.map(Token.app)
-        let categories = selection.categoryTokens.map(Token.category)
-        let sites = selection.webDomainTokens.map(Token.web)
-        return Array((apps + categories + sites).prefix(3))
+    var body: some View {
+        let names = ChosenToken.all(selection).map(Name.token) + websites.map(Name.site)
+        HStack(spacing: 0) {
+            ForEach(Array(names.prefix(shown).enumerated()), id: \.offset) { index, name in
+                if index > 0 {
+                    Text(", ")
+                }
+                switch name {
+                case let .token(token): token.name
+                case let .site(site): Text(site)
+                }
+            }
+            if names.count > shown {
+                Text(" +\(names.count - shown)")
+            }
+        }
+        .lineLimit(1)
     }
+}
 
-    @ViewBuilder
-    private func tile(_ token: Token) -> some View {
-        Group {
-            switch token {
-            case let .app(token): Label(token).labelStyle(.iconOnly)
-            case let .category(token): Label(token).labelStyle(.iconOnly)
-            case let .web(token): Label(token).labelStyle(.iconOnly)
+/// A run's route in a small square, north up, from the red dot. A treadmill
+/// run gets a little track instead.
+struct RouteThumbnail: View {
+    let segments: [[Coordinate]]
+    var isTreadmill = false
+    var size: CGFloat = 64
+
+    var body: some View {
+        Canvas { context, box in
+            var grid = Path()
+            for share in [0.31, 0.69] {
+                grid.move(to: CGPoint(x: box.width * share, y: 0))
+                grid.addLine(to: CGPoint(x: box.width * share, y: box.height))
+                grid.move(to: CGPoint(x: 0, y: box.height * share))
+                grid.addLine(to: CGPoint(x: box.width, y: box.height * share))
+            }
+            context.stroke(grid, with: .color(JL.card), lineWidth: 3)
+            let line = StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
+            if isTreadmill {
+                let lane = CGRect(origin: .zero, size: box).insetBy(dx: box.width * 0.16, dy: box.height * 0.3)
+                context.stroke(Path(roundedRect: lane, cornerRadius: lane.height / 2), with: .color(JL.ink), style: line)
+                return
+            }
+            let route = Route.project(segments, width: box.width, height: box.height, padding: box.width * 0.16)
+            var path = Path()
+            for segment in route where !segment.isEmpty {
+                path.addLines(segment.map { CGPoint(x: $0.x, y: $0.y) })
+            }
+            context.stroke(path, with: .color(JL.ink), style: line)
+            if let start = route.first?.first {
+                context.fill(Path(ellipseIn: CGRect(x: start.x - 4, y: start.y - 4, width: 8, height: 8)), with: .color(JL.red))
             }
         }
         .frame(width: size, height: size)
-        .background(JL.sand)
-        .clipShape(RoundedRectangle(cornerRadius: size * 0.25, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: size * 0.25, style: .continuous).stroke(border, lineWidth: 2))
+        .background(JL.infield)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityHidden(true)
+    }
+}
+
+/// A lock buddy's first letter in a red circle.
+struct BuddyAvatar: View {
+    let name: String
+    var size: CGFloat = 34
+
+    var body: some View {
+        Text(name.first.map { String($0).uppercased() } ?? "?")
+            .font(.jlHeading(size * 0.44, relativeTo: .body))
+            .foregroundStyle(JL.card)
+            .frame(width: size, height: size)
+            .background(JL.red, in: Circle())
+            .accessibilityHidden(true)
     }
 }
 
