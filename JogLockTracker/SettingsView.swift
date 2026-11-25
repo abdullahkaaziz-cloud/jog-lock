@@ -8,6 +8,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    /// In its own tab there's nothing to close.
+    var showsDone = true
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var lock = AppLock.shared
     @State private var diagnostics: URL?
@@ -74,12 +76,15 @@ struct SettingsView: View {
             .task {
                 diagnostics = lock.diagnosticsFile()
             }
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(showsDone ? .inline : .large)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                if showsDone {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                    }
                 }
             }
+            .jlScreen()
         }
     }
 }

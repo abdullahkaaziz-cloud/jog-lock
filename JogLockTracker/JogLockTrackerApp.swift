@@ -20,7 +20,7 @@ struct JogLockTrackerApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
                 .environmentObject(tracker)
                 .environmentObject(lock)
                 .tint(JL.red)

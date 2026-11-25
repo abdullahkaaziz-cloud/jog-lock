@@ -9,9 +9,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var tracker: RunTracker
     @EnvironmentObject private var lock: AppLock
-    @Environment(\.scenePhase) private var scenePhase
     @State private var confirmStop = false
-    @State private var showSettings = false
 
     var body: some View {
         NavigationStack {
@@ -35,10 +33,7 @@ struct ContentView: View {
 
                     let ring = ringValues
                     DistanceRing(meters: ring.meters, targetKm: ring.targetKm, reached: ring.reached)
-                    if !tracker.isActive {
-                        AppLockCard()
-                    }
-                    if !tracker.isActive || lock.hasRunOnly {
+                    if tracker.isActive && lock.hasRunOnly {
                         RunOnlyCard()
                     }
 
@@ -67,47 +62,14 @@ struct ContentView: View {
                         ReelButton(run: run)
                     }
 
-                    if !tracker.isActive && lock.isAuthorized {
-                        TimeOnAppsCard()
-                    }
-
                     if !tracker.isActive {
                         howToCard
                     }
                 }
                 .padding()
             }
-            .navigationTitle("Jog Lock")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Label("Settings", systemImage: "gearshape")
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink {
-                        RunListView()
-                    } label: {
-                        Label("Runs", systemImage: "list.bullet")
-                    }
-                }
-            }
-            .sheet(isPresented: $showSettings) {
-                SettingsView()
-            }
-            .fullScreenCover(isPresented: $lock.celebrating) {
-                UnlockCelebrationView(selection: lock.selection, app: AppSettings.shared.nemesis) {
-                    lock.celebrating = false
-                }
-            }
-            .onChange(of: scenePhase, initial: true) { _, phase in
-                lock.setActive(phase == .active)
-                if phase == .active {
-                    Task { await LockBuddies.shared.sync(reason: "open") }
-                }
-            }
+            .navigationTitle("Today")
+            .jlScreen()
             .confirmationDialog("Stop this run?", isPresented: $confirmStop, titleVisibility: .visible) {
                 Button("Stop and save", role: .destructive) { tracker.stop() }
                 Button("Keep going", role: .cancel) {}
