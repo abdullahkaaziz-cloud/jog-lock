@@ -22,6 +22,31 @@ public enum Format {
         return "\(max(10, Int((m / 10).rounded()) * 10)) m"
     }
 
+    /// A distance in kilometres to one decimal, without the unit: "1.2".
+    public static func tenths(_ meters: Double) -> String {
+        String(format: "%.1f", max(meters, 0) / 1_000)
+    }
+
+    /// A distance for a big number, with its unit apart: ("1.8", "km"), and
+    /// metres under a kilometre: ("650", "m").
+    public static func bigDistance(_ meters: Double) -> (value: String, unit: String) {
+        let m = max(meters, 0)
+        if m >= 995 {
+            return (tenths(m), "km")
+        }
+        return ("\(Int((m / 10).rounded()) * 10)", "m")
+    }
+
+    /// When a run started, as people say it: "This morning".
+    public static func partOfDay(hour: Int) -> String {
+        switch hour {
+        case 5..<12: "This morning"
+        case 12..<17: "This afternoon"
+        case 17..<22: "This evening"
+        default: "Tonight"
+        }
+    }
+
     public static func duration(_ seconds: Double) -> String {
         guard seconds.isFinite, seconds >= 0 else { return "--" }
         let total = Int(seconds.rounded())

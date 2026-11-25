@@ -10,6 +10,29 @@ struct FormatTests {
         #expect(Format.km(0) == "0.00")
     }
 
+    @Test("Big numbers: tenths of a km, and metres under a km")
+    func bigDistance() {
+        #expect(Format.tenths(1_249) == "1.2")
+        #expect(Format.tenths(-5) == "0.0")
+        func big(_ meters: Double) -> String {
+            let big = Format.bigDistance(meters)
+            return "\(big.value) \(big.unit)"
+        }
+        #expect(big(1_800) == "1.8 km")
+        #expect(big(995) == "1.0 km")
+        #expect(big(994) == "990 m")
+        #expect(big(0) == "0 m")
+    }
+
+    @Test("Part of the day a run started in")
+    func partOfDay() {
+        #expect(Format.partOfDay(hour: 7) == "This morning")
+        #expect(Format.partOfDay(hour: 12) == "This afternoon")
+        #expect(Format.partOfDay(hour: 21) == "This evening")
+        #expect(Format.partOfDay(hour: 23) == "Tonight")
+        #expect(Format.partOfDay(hour: 4) == "Tonight")
+    }
+
     @Test("Short distances read like a label: 1.8 km, 2 km, 750 m")
     func shortDistance() {
         #expect(Format.shortDistance(1_800) == "1.8 km")
