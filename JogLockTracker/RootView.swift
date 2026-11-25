@@ -7,6 +7,7 @@
 //  whichever tab is open.
 //
 
+import JogLockCore
 import SwiftUI
 
 enum AppTab: Hashable {
