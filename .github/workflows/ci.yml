@@ -114,3 +114,10 @@ jobs:
           done
           style=$(plutil -extract UIUserInterfaceStyle raw "$app/Info.plist")
           [ "$style" = Light ] || { echo "::error::UIUserInterfaceStyle is $style, expected Light"; exit 1; }
+          widget="$app/PlugIns/JogLockWidgets.appex"
+          widget_fonts=$(plutil -extract UIAppFonts json -o - "$widget/Info.plist")
+          for font in ArchivoTrack-Display ArchivoTrack-Heading; do
+            test -f "$widget/$font.ttf" || { echo "::error::$font.ttf is missing from the Live Activity"; ls "$widget"; exit 1; }
+            echo "$widget_fonts" | grep -q "\"$font.ttf\"" || { echo "::error::$font.ttf is not in the widget's UIAppFonts"; exit 1; }
+            echo "Live Activity $font: ok"
+          done

@@ -7,5 +7,10 @@
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.widgetkit-extension</string>
 	</dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>ArchivoTrack-Display.ttf</string>
+		<string>ArchivoTrack-Heading.ttf</string>
+	</array>
 </dict>
 </plist>

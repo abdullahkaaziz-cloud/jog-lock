@@ -72,6 +72,19 @@ motion, notifications, each with why), and a summary. The apps are only
 locked by LOCK MY APPS at the end. Anyone with the lock on, runs saved or a
 distance set is marked done and never sees it.
 
+## Outside the app
+
+- Shields: a locked app is track red with Jog Lock's mark (a track with a
+  padlock in the infield), "TikTok is 1.8 km away" and a line that changes
+  each minute, and a paper Run now button. A run-only app is warm paper
+  with ink, "Spotify is for runs" and a red Run now.
+- Live Activity: on the lock screen, a paper card with the time, "0.57 KM
+  TO TIKTOK" and the run as a red lane filling with ink up to the runner.
+  In the Dynamic Island, a red dot for running, the distance left, and a
+  red progress ring when it's at its smallest. The widget extension carries
+  the Display and Heading fonts, and `Theme.swift` lives in `Shared/` so it
+  uses the same colours.
+
 ## Behaviour the design adds
 
 Onboarding · hold to finish a run · Receipt share card · red shield with

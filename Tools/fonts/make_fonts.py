@@ -10,6 +10,9 @@ result "Archivo Track" so iOS can load each style by its PostScript name.
 
 VARIABLE_FONT_DIR holds Archivo[wdth,wght].ttf and Archivo-Italic[wdth,wght].ttf
 from https://github.com/google/fonts/tree/main/ofl/archivo.
+
+The Live Activity carries its own copies of the Display and Heading cuts:
+copy them, with OFL.txt, into JogLockWidgets/Fonts after making them.
 """
 
 import sys

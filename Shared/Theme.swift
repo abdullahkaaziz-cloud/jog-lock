@@ -1,9 +1,10 @@
 //
 //  Theme.swift
-//  JogLockTracker
+//  Shared between the app and the JogLockWidgets extension.
 //
 //  Race Day · Track: the colours and type every screen uses
-//  (docs/design/DESIGN.md).
+//  (docs/design/DESIGN.md), and the Live Activity too. Both bundles carry
+//  the Archivo fonts they use.
 //
 
 import SwiftUI

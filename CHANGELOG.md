@@ -6,6 +6,7 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ### Added
 
+- Race Day · Track design, step 10: shields in track red with Jog Lock's own mark (warm paper for run-only apps), and the Live Activity as a paper card with the distance left and the run as a red lane, with a red dot and progress ring in the Dynamic Island. The widget carries the Archivo fonts it uses.
 - Race Day · Track design, step 9: onboarding on first launch only: what Jog Lock does, which apps to lock, how far to run (or the 5K plan) and rest days, the permissions and why each is needed, and a summary before LOCK MY APPS. Nothing locks until then. People who already use Jog Lock skip it.
 - Race Day · Track design, step 8: the plan as cards to pick from (Every day, Each week, 5K plan) with a big distance, rest days and Save; the 5K plan's week with this week's three runs, what's coming and Repeat week; Settings in groups (you, voice coach, running, lock, help) with privacy and testing notes on their own screens; and Shoes with the pair you're wearing, how far it has left, and the other pairs.
 - Race Day · Track design, step 7: the Lock tab, with where the lock stands on an ink card, what stays locked until you run, today's plan, banked time and borrowing, a switch for run-only apps, the lock buddy, time on apps and how to make the lock unbreakable. "Need your apps now?" puts banked time, borrowing and the run side by side, from Today and the Lock tab. The lock buddy, websites and time on apps screens are redrawn; the receipt gets a PAID stamp.
