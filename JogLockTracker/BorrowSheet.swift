@@ -39,7 +39,10 @@ struct BorrowSheet: View {
             if ledger.remainingMeters > 0 {
                 Button {
                     dismiss()
-                    tracker.start()
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(500))
+                        tracker.start()
+                    }
                 } label: {
                     Label("Or run \(Format.shortDistance(ledger.remainingMeters)) and keep them till \(dayEnd)",
                           systemImage: "play.fill")

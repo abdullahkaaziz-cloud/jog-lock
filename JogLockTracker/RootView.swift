@@ -36,7 +36,7 @@ struct RootView: View {
                 LockTab()
             }
             Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
-                SettingsView(showsDone: false)
+                SettingsView()
             }
         }
         .fullScreenCover(item: cover) { cover in

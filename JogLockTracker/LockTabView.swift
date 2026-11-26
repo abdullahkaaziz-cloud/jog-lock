@@ -77,6 +77,7 @@ struct LockTab: View {
             .sheet(isPresented: $editingPlan) {
                 PlanView(targetKm: $tracker.targetKm)
                     .environmentObject(lock)
+                    .environmentObject(tracker)
             }
             .confirmationDialog("Turn off the app lock?", isPresented: $confirmOff, titleVisibility: .visible) {
                 Button("Turn off", role: .destructive) { lock.turnOff() }
@@ -430,13 +431,9 @@ struct LockTab: View {
                         .rotationEffect(.degrees(showsHowTo ? 90 : 0))
                 }
                 if showsHowTo {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("1. They set it: Settings → Screen Time → Lock Screen Time Settings. Only they should know the code.")
-                        Text("2. Check it: Settings → Screen Time → Apps with Screen Time Access → turn off Jog Lock. It should ask for their code. Tap Cancel.")
-                        Text("If your own Face ID or passcode works instead, it isn't locked down.")
-                    }
-                    .font(.footnote)
-                    .foregroundStyle(JL.ink)
+                    UnbreakableSteps()
+                        .font(.footnote)
+                        .foregroundStyle(JL.ink)
                 }
             }
             .multilineTextAlignment(.leading)

@@ -57,6 +57,7 @@ struct TodayView: View {
             .sheet(isPresented: $editingPlan) {
                 PlanView(targetKm: $tracker.targetKm)
                     .environmentObject(lock)
+                    .environmentObject(tracker)
             }
             .sheet(isPresented: $showingBuddies) {
                 BuddiesView()

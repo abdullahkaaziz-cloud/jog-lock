@@ -2,8 +2,8 @@
 //  ShoesView.swift
 //  JogLockTracker
 //
-//  Shoe mileage: the pair you're wearing on the home screen, and the list
-//  of pairs with how worn each is. Each run's counted distance goes to the
+//  Shoe mileage: the pair you're wearing and the other pairs, with how
+//  worn each is. Each run's counted distance goes to the
 //  pair being worn (ShoeRack), and a notification comes at 80% of a pair's
 //  limit and at the limit. Kept on the phone only.
 //
@@ -43,95 +43,87 @@ final class ShoeStore: ObservableObject {
     }
 }
 
-/// The pair being worn, on the home screen.
-struct ShoesRow: View {
-    @ObservedObject private var store = ShoeStore.shared
-    @State private var showing = false
-
-    var body: some View {
-        Button {
-            showing = true
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "shoe.2.fill")
-                    .font(.title3)
-                    .foregroundStyle(.green)
-                if let shoe = store.rack.active {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(shoe.name)
-                                .font(.subheadline.weight(.semibold))
-                            Spacer()
-                            Text(Format.shortDistance(max(10, shoe.meters)))
-                                .font(.subheadline)
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
-                        }
-                        ProgressView(value: min(1, shoe.wear))
-                            .tint(ShoesView.tint(shoe.wear))
-                    }
-                } else {
-                    Text("Track your running shoes' kilometres")
-                        .font(.subheadline)
-                    Spacer()
-                }
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding()
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        }
-        .buttonStyle(.plain)
-        .sheet(isPresented: $showing) {
-            NavigationStack {
-                ShoesView()
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { showing = false }
-                        }
-                    }
-            }
-        }
-    }
-}
-
+/// Your shoes: the pair you're wearing, how worn each pair is, and the
+/// ones you've retired. Each run's counted distance goes to the pair
+/// being worn.
 struct ShoesView: View {
     @ObservedObject private var store = ShoeStore.shared
+    @ObservedObject private var lock = AppLock.shared
     @State private var adding = false
     @State private var editing: Shoe?
 
     var body: some View {
         let rack = store.rack
-        List {
-            Section {
-                ForEach(rack.shoes.filter { $0.retired == nil }) { shoe in
-                    row(shoe, wearing: shoe.id == rack.activeID)
+        let others = rack.shoes.filter { $0.retired == nil && $0.id != rack.active?.id }
+        let retired = rack.shoes.filter { $0.retired != nil }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                if let shoe = rack.active {
+                    wearing(shoe)
+                } else {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Track your running shoes' kilometres")
+                            .font(.headline)
+                        Text("Running shoes usually last 500 to 800 km. Add a pair and every run counts towards it.")
+                            .font(.subheadline)
+                            .foregroundStyle(JL.ink2)
+                        Button {
+                            adding = true
+                        } label: {
+                            Label("Add a pair", systemImage: "plus")
+                        }
+                        .buttonStyle(.jlInk)
+                    }
+                    .padding(16)
+                    .background(JL.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
+                if !others.isEmpty || !retired.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        SectionLabel("Other pairs")
+                        JLList {
+                            ForEach(others) { shoe in
+                                other(shoe)
+                            }
+                            ForEach(retired) { shoe in
+                                HStack {
+                                    Text("\(shoe.name) · retired")
+                                        .foregroundStyle(JL.ink2)
+                                    Spacer()
+                                    Text(Format.shortDistance(max(10, shoe.meters)))
+                                        .monospacedDigit()
+                                        .foregroundStyle(JL.ink2)
+                                }
+                                .padding(.horizontal, 16)
+                                .frame(minHeight: 52)
+                                .contentShape(Rectangle())
+                                .contextMenu {
+                                    Button("Delete", role: .destructive) {
+                                        store.change { $0.remove(shoe.id) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Text("Each run adds to the pair you're wearing. Set your own limit per pair; you get a nudge at 80% and at 100%. Touch and hold a pair to wear, edit or retire it.")
+                    .font(.footnote)
+                    .foregroundStyle(JL.ink2)
+            }
+            .foregroundStyle(JL.ink)
+            .padding(20)
+        }
+        .jlScreen()
+        .navigationTitle("Shoes")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     adding = true
                 } label: {
-                    Label("Add a pair", systemImage: "plus")
-                }
-            } header: {
-                Text("Your shoes")
-            } footer: {
-                Text("Each run's distance goes to the pair you're wearing. Running shoes usually last 500–800 km; you'll get a heads-up at 80% of each pair's limit, and at the limit.")
-            }
-            let retired = rack.shoes.filter { $0.retired != nil }
-            if !retired.isEmpty {
-                Section("Retired") {
-                    ForEach(retired) { shoe in
-                        LabeledContent(shoe.name, value: Format.shortDistance(max(10, shoe.meters)))
-                    }
-                    .onDelete { offsets in
-                        let ids = offsets.map { retired[$0].id }
-                        store.change { rack in ids.forEach { rack.remove($0) } }
-                    }
+                    Image(systemName: "plus")
                 }
             }
         }
-        .navigationTitle("Shoes")
         .sheet(isPresented: $adding) {
             ShoeEditor(shoe: nil) { name, start, limit in
                 store.change { $0.add(name: name, startMeters: start, limitMeters: limit, at: Date()) }
@@ -144,42 +136,84 @@ struct ShoesView: View {
         }
     }
 
-    private func row(_ shoe: Shoe, wearing: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+    /// The pair you're wearing: how far it's gone and how far it has left.
+    private func wearing(_ shoe: Shoe) -> some View {
+        let left = max(0, shoe.limitMeters - shoe.meters)
+        let runs = Int(left / max(250, lock.rules.dailyMeters))
+        return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(shoe.name)
-                    .font(.body.weight(wearing ? .semibold : .regular))
-                if wearing {
-                    Text("Wearing")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.green.opacity(0.2), in: Capsule())
-                }
+                Text("Wearing")
+                    .jlLabel()
+                    .foregroundStyle(JL.ink2)
                 Spacer()
-                Text("\(Format.shortDistance(max(10, shoe.meters))) of \(Format.shortDistance(shoe.limitMeters))")
-                    .font(.subheadline)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                Image(systemName: "shoe.2.fill")
+                    .foregroundStyle(JL.ink2)
+            }
+            Text(shoe.name)
+                .font(.jlHeading(26, relativeTo: .title))
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("\(Int(shoe.meters / 1_000))")
+                    .jlNumber(48)
+                Text("of \(Int(shoe.limitMeters / 1_000)) km")
+                    .font(.headline)
+                    .foregroundStyle(JL.ink2)
             }
             ProgressView(value: min(1, shoe.wear))
                 .tint(Self.tint(shoe.wear))
+            Text(left > 0
+                 ? "\(Format.shortDistance(left)) left, about \(runs) \(runs == 1 ? "run" : "runs") at \(Format.shortDistance(lock.rules.dailyMeters))."
+                 : "Past their limit. Time for a new pair.")
+                .font(.subheadline)
+                .foregroundStyle(JL.ink2)
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            store.change { $0.wear(shoe.id) }
-        }
-        .swipeActions {
+        .padding(18)
+        .background(JL.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .contextMenu {
+            Button("Edit") { editing = shoe }
             Button("Retire") {
                 store.change { $0.retire(shoe.id, at: Date()) }
             }
-            .tint(.orange)
+        }
+    }
+
+    private func other(_ shoe: Shoe) -> some View {
+        Button {
+            store.change { $0.wear(shoe.id) }
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(shoe.name)
+                        .fontWeight(.bold)
+                    Spacer()
+                    Text("\(Int(shoe.meters / 1_000)) of \(Int(shoe.limitMeters / 1_000)) km")
+                        .monospacedDigit()
+                        .foregroundStyle(JL.ink2)
+                }
+                ProgressView(value: min(1, shoe.wear))
+                    .tint(Self.tint(shoe.wear))
+                if shoe.wear >= Shoe.nearlyShare {
+                    Text(shoe.wear >= 1 ? "Past their limit." : "Past 80%. Time to look for a new pair.")
+                        .font(.footnote)
+                        .foregroundStyle(JL.redText)
+                }
+            }
+            .padding(16)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button("Wear these") {
+                store.change { $0.wear(shoe.id) }
+            }
             Button("Edit") { editing = shoe }
+            Button("Retire") {
+                store.change { $0.retire(shoe.id, at: Date()) }
+            }
         }
     }
 
     static func tint(_ wear: Double) -> Color {
-        wear >= 1 ? .red : wear >= Shoe.nearlyShare ? .orange : .green
+        wear >= Shoe.nearlyShare ? JL.red : JL.ink
     }
 }
 
@@ -201,6 +235,8 @@ struct ShoeEditor: View {
                 }
                 Stepper("New ones at: \(Int(limitKm)) km", value: $limitKm, in: 300...1_200, step: 50)
             }
+            .scrollContentBackground(.hidden)
+            .background(JL.paper)
             .navigationTitle(shoe == nil ? "New pair" : "Edit pair")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
