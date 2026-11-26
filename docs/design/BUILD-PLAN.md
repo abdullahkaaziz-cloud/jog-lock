@@ -14,8 +14,8 @@ tests and the unsigned iOS build) is green before the next step starts.
 | 3 | Today: track hero and its states, start row, chips, buddy | `design/3-today` | done (#22) |
 | 4 | Live run: tall track, intervals, treadmill, Nice try, hold to finish | `design/4-live-run` | done (#23) |
 | 5 | After the run: unlocked, summary, share card styles, reel | `design/5-after-run` | done (#24) |
-| 6 | Runs: month view, run detail, your month | `design/6-runs` | in progress |
-| 7 | Lock: lock tab, websites, borrow sheet, buddy, time on apps | `design/7-lock` | to do |
+| 6 | Runs: month view, run detail, your month | `design/6-runs` | done (#25) |
+| 7 | Lock: lock tab, websites, borrow sheet, buddy, time on apps | `design/7-lock` | in progress |
 | 8 | Plan and settings: plan, Couch to 5K, settings, shoes | `design/8-plan-settings` | to do |
 | 9 | Onboarding: welcome, apps, distance, permissions, ready | `design/9-onboarding` | to do |
 | 10 | Outside the app: shields and the Live Activity | `design/10-outside` | to do |
