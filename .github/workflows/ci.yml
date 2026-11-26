@@ -68,3 +68,56 @@ jobs:
           -derivedDataPath DerivedData
           -quiet
           CODE_SIGNING_ALLOWED=NO
+      # The app's extensions only run if they're inside the app, with the
+      # right extension point and class. A wrong project setting would still
+      # build, so check what was built.
+      - name: Check the extensions inside the app
+        run: |
+          plugins=DerivedData/Build/Products/Debug-iphoneos/JogLockTracker.app/PlugIns
+          ls "$plugins"
+          check() {
+            plist="$plugins/$1.appex/Info.plist"
+            test -f "$plist" || { echo "::error::$1.appex is missing from the app"; exit 1; }
+            point=$(plutil -extract NSExtension.NSExtensionPointIdentifier raw "$plist")
+            [ "$point" = "$2" ] || { echo "::error::$1 has extension point $point, expected $2"; exit 1; }
+            if [ -n "$3" ]; then
+              class=$(plutil -extract NSExtension.NSExtensionPrincipalClass raw "$plist")
+              [ "$class" = "$3" ] || { echo "::error::$1 has principal class $class, expected $3"; exit 1; }
+            fi
+            echo "$1: $point ${3:-}"
+          }
+          check JogLockWidgets com.apple.widgetkit-extension ""
+          check JogLockMonitor com.apple.deviceactivity.monitor-extension JogLockMonitor.DeviceActivityMonitorExtension
+          check JogLockShield com.apple.ManagedSettingsUI.shield-configuration-service JogLockShield.ShieldConfigurationExtension
+          check JogLockShieldAction com.apple.ManagedSettings.shield-action-service JogLockShieldAction.ShieldActionExtension
+      # The time-on-apps report is an ExtensionKit extension: it lives in the
+      # app's Extensions folder, not PlugIns, and has no principal class.
+      - name: Check the report extension inside the app
+        run: |
+          plist=DerivedData/Build/Products/Debug-iphoneos/JogLockTracker.app/Extensions/JogLockReport.appex/Info.plist
+          test -f "$plist" || { echo "::error::JogLockReport.appex is missing from the app's Extensions folder"; exit 1; }
+          point=$(plutil -extract EXAppExtensionAttributes.EXExtensionPointIdentifier raw "$plist")
+          [ "$point" = com.apple.deviceactivityui.report-extension ] || { echo "::error::JogLockReport has extension point $point"; exit 1; }
+          type=$(plutil -extract CFBundlePackageType raw "$plist")
+          [ "$type" = 'XPC!' ] || { echo "::error::JogLockReport has package type $type, expected XPC!"; exit 1; }
+          echo "JogLockReport: $point $type"
+      # The design's fonts load by name: if a file is missing from the app or
+      # from UIAppFonts, iOS quietly falls back to the system font.
+      - name: Check the fonts inside the app
+        run: |
+          app=DerivedData/Build/Products/Debug-iphoneos/JogLockTracker.app
+          fonts=$(plutil -extract UIAppFonts json -o - "$app/Info.plist")
+          for font in ArchivoTrack-Display ArchivoTrack-DisplayItalic ArchivoTrack-Heading; do
+            test -f "$app/$font.ttf" || { echo "::error::$font.ttf is missing from the app"; ls "$app"; exit 1; }
+            echo "$fonts" | grep -q "\"$font.ttf\"" || { echo "::error::$font.ttf is not in UIAppFonts"; exit 1; }
+            echo "$font: ok"
+          done
+          style=$(plutil -extract UIUserInterfaceStyle raw "$app/Info.plist")
+          [ "$style" = Light ] || { echo "::error::UIUserInterfaceStyle is $style, expected Light"; exit 1; }
+          widget="$app/PlugIns/JogLockWidgets.appex"
+          widget_fonts=$(plutil -extract UIAppFonts json -o - "$widget/Info.plist")
+          for font in ArchivoTrack-Display ArchivoTrack-Heading; do
+            test -f "$widget/$font.ttf" || { echo "::error::$font.ttf is missing from the Live Activity"; ls "$widget"; exit 1; }
+            echo "$widget_fonts" | grep -q "\"$font.ttf\"" || { echo "::error::$font.ttf is not in the widget's UIAppFonts"; exit 1; }
+            echo "Live Activity $font: ok"
+          done
