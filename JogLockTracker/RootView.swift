@@ -21,6 +21,8 @@ struct RootView: View {
     @State private var tab: AppTab = .today
     /// The finished run whose summary or unlock moment has been closed.
     @State private var seenRunID: String?
+    /// The first-launch steps, until they're done.
+    @State private var onboarding = Onboarding.isNeeded()
 
     var body: some View {
         TabView(selection: $tab) {
@@ -41,6 +43,10 @@ struct RootView: View {
         }
         .fullScreenCover(item: cover) { cover in
             switch cover {
+            case .onboarding:
+                OnboardingView { onboarding = false }
+                    .environmentObject(lock)
+                    .environmentObject(tracker)
             case .run:
                 LiveRunView()
                     .environmentObject(tracker)
@@ -69,17 +75,20 @@ struct RootView: View {
         }
     }
 
-    /// What covers the tabs: a run in progress until it's saved, then the
-    /// unlock moment if it unlocked the apps, or else its summary. The
-    /// unlock moment also comes up on its own, when a lock buddy's running
-    /// opens the apps.
+    /// What covers the tabs: the first-launch steps, a run in progress
+    /// until it's saved, then the unlock moment if it unlocked the apps, or
+    /// else its summary. The unlock moment also comes up on its own, when a
+    /// lock buddy's running opens the apps.
     private enum Cover: String, Identifiable {
-        case run, unlocked, summary
+        case onboarding, run, unlocked, summary
         var id: String { rawValue }
     }
 
     private var cover: Binding<Cover?> {
         Binding(get: {
+            if onboarding {
+                return .onboarding
+            }
             if tracker.isActive {
                 return .run
             }

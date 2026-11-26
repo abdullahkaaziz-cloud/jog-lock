@@ -64,6 +64,14 @@ how it was counted, the shoes, Share card and Make a reel. Share cards come
 in three styles, Track, Route and Receipt; the reel is drawn on a paper map
 and only opens the lock if the run met its target.
 
+## First launch
+
+Five steps: welcome, apps (Screen Time's picker; websites too), distance
+(or the 5K plan) and rest days, permissions (Screen Time, location,
+motion, notifications, each with why), and a summary. The apps are only
+locked by LOCK MY APPS at the end. Anyone with the lock on, runs saved or a
+distance set is marked done and never sees it.
+
 ## Behaviour the design adds
 
 Onboarding · hold to finish a run · Receipt share card · red shield with
