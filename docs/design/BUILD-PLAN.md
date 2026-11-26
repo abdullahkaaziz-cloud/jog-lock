@@ -17,7 +17,7 @@ tests and the unsigned iOS build) is green before the next step starts.
 | 6 | Runs: month view, run detail, your month | `design/6-runs` | done (#25) |
 | 7 | Lock: lock tab, websites, borrow sheet, buddy, time on apps | `design/7-lock` | done (#26) |
 | 8 | Plan and settings: plan, Couch to 5K, settings, shoes | `design/8-plan-settings` | done (#27) |
-| 9 | Onboarding: welcome, apps, distance, permissions, ready | `design/9-onboarding` | in progress |
-| 10 | Outside the app: shields and the Live Activity | `design/10-outside` | to do |
+| 9 | Onboarding: welcome, apps, distance, permissions, ready | `design/9-onboarding` | done (#28) |
+| 10 | Outside the app: shields and the Live Activity | `design/10-outside` | in progress |
 
 Status words: `to do`, `in progress`, `done (#PR)`.
