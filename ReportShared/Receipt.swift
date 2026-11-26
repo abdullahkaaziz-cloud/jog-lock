@@ -10,9 +10,13 @@
 import SwiftUI
 
 enum Receipt {
-    static let paper = Color(red: 0.98, green: 0.97, blue: 0.93)
-    static let ink = Color(white: 0.12)
-    static let faded = Color(white: 0.42)
+    /// Race Day's card white, ink and second ink (JL.card, JL.ink, JL.ink2),
+    /// written out because the extension doesn't have the app's theme.
+    static let paper = Color(red: 1, green: 0.992, blue: 0.973)
+    static let ink = Color(red: 0.09, green: 0.078, blue: 0.059)
+    static let faded = Color(red: 0.369, green: 0.345, blue: 0.31)
+    /// The PAID stamp's red (JL.redText).
+    static let stamp = Color(red: 0.659, green: 0.165, blue: 0.078)
     static let font = Font.system(size: 14, weight: .regular, design: .monospaced)
     static let bold = Font.system(size: 14, weight: .bold, design: .monospaced)
     static let small = Font.system(size: 12, weight: .regular, design: .monospaced)

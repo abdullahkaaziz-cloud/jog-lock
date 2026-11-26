@@ -22,9 +22,7 @@ struct TodayView: View {
     @State private var runs: [RunSummary] = []
     @State private var editingPlan = false
     @State private var showingBuddies = false
-    @State private var confirmSpend = false
-    @State private var confirmLockAgain = false
-    @State private var confirmBorrow = false
+    @State private var borrowing = false
 
     private enum Look {
         case locked, unlocked, rest, accessOff, noLock
@@ -64,25 +62,10 @@ struct TodayView: View {
                 BuddiesView()
                     .environmentObject(lock)
             }
-            .confirmationDialog("Open your apps for \(lock.ledger.spendableMinutes) minutes?",
-                                isPresented: $confirmSpend, titleVisibility: .visible) {
-                Button("Open them") { lock.spend() }
-                Button("Not now", role: .cancel) {}
-            } message: {
-                Text("Minutes only count while you're using the locked apps. Lock them again whenever you like.")
-            }
-            .confirmationDialog("Lock your apps again?", isPresented: $confirmLockAgain, titleVisibility: .visible) {
-                Button("Lock again") { lock.stopSpending() }
-                Button("Keep them open", role: .cancel) {}
-            } message: {
-                Text("The minutes left stay banked.")
-            }
-            .confirmationDialog("Borrow \(Int(lock.rules.borrowMinutes)) minutes from tomorrow?",
-                                isPresented: $confirmBorrow, titleVisibility: .visible) {
-                Button("Borrow") { lock.borrow() }
-                Button("Not now", role: .cancel) {}
-            } message: {
-                Text("Your apps open now, and every minute you use them counts. Tomorrow's run goes up by \(Format.shortDistance(lock.rules.borrowMeters)).")
+            .sheet(isPresented: $borrowing) {
+                BorrowSheet()
+                    .environmentObject(lock)
+                    .environmentObject(tracker)
             }
             .task(id: tracker.lastFinishedRun?.id) {
                 runs = RunStore.onDevice.allSummaries()
@@ -343,15 +326,7 @@ struct TodayView: View {
     }
 
     private var planText: String {
-        let plan = lock.plan
-        switch plan.kind {
-        case .daily:
-            return "\(Format.shortDistance(lock.rules.dailyMeters)) a day"
-        case .weekly:
-            return "\(Format.shortDistance(plan.weeklyMeters)) a week"
-        case .fiveK:
-            return "5K · week \(plan.fiveKWeekNumber(on: lock.today))"
-        }
+        PlanText.summary(lock.plan, dailyMeters: lock.rules.dailyMeters, today: lock.today)
     }
 
     @ViewBuilder
@@ -509,27 +484,21 @@ struct TodayView: View {
     private func chips(_ ledger: LockLedger) -> some View {
         let problem = ledger.borrowProblem(rules: lock.rules)
         return HStack(spacing: 10) {
-            if ledger.spending {
-                Button {
-                    confirmLockAgain = true
-                } label: {
+            Button {
+                borrowing = true
+            } label: {
+                if ledger.spending {
                     chip(ledger.isOpen ? "Open · \(ledger.spendableMinutes) min left" : "Opening…", "Tap to lock again")
-                }
-            } else {
-                Button {
-                    confirmSpend = true
-                } label: {
+                } else {
                     chip("\(ledger.spendableMinutes) min banked", "from extra km")
                 }
-                .disabled(ledger.spendableMinutes < 1)
             }
             Button {
-                confirmBorrow = true
+                borrowing = true
             } label: {
                 chip("Borrow \(Int(lock.rules.borrowMinutes)) min",
                      problem.map(Self.whyNoBorrowing) ?? "+\(Format.shortDistance(lock.rules.borrowMeters)) tomorrow")
             }
-            .disabled(problem != nil)
         }
         .buttonStyle(.jlChip)
     }

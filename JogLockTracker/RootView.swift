@@ -118,29 +118,6 @@ struct RootView: View {
     }
 }
 
-/// The Lock tab: what's locked and the rules around it.
-/// Redesigned in step 7 of docs/design/BUILD-PLAN.md.
-struct LockTab: View {
-    @EnvironmentObject private var lock: AppLock
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    AppLockCard()
-                    RunOnlyCard()
-                    if lock.isAuthorized {
-                        TimeOnAppsCard()
-                    }
-                }
-                .padding()
-            }
-            .navigationTitle("Lock")
-            .jlScreen()
-        }
-    }
-}
-
 #Preview {
     RootView()
         .environmentObject(RunTracker.shared)

@@ -281,6 +281,15 @@ enum PlanText {
         }
     }
 
+    /// The plan in a few words: "3 km a day", "20 km a week", "5K · week 3".
+    static func summary(_ plan: RunPlan, dailyMeters: Double, today: LockDay) -> String {
+        switch plan.kind {
+        case .daily: "\(Format.shortDistance(dailyMeters)) a day"
+        case .weekly: "\(Format.shortDistance(plan.weeklyMeters)) a week"
+        case .fiveK: "5K · week \(plan.fiveKWeekNumber(on: today))"
+        }
+    }
+
     /// "1.8 km", or "0 km" before any running.
     static func distance(_ meters: Double) -> String {
         meters < 10 ? "0 km" : Format.shortDistance(meters)
