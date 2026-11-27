@@ -4,6 +4,14 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ## [Unreleased]
 
+### Fixed
+
+- After the first runs on two iPhones (27 Nov): the Live Activity's clock stops at the finish and says Finished, instead of counting on for the 15 minutes the card stays on the lock screen.
+- The live run's "at the finish" pill shows the apps' icons and how many more, not the app's name: iOS drew the name in its own size and black, unreadable on ink, and stretched the pill across the screen.
+- When distance is all there but the last stretch is still being checked against the steps (up to a minute, ADR-0003), the run screen and the Live Activity say "Checking your steps" instead of "0.00 km to unlock".
+- A run's details keep back and the menu below the status bar, with a paper backing once the panel scrolls up to them, so the text no longer runs into the clock.
+- Treadmill runs' details leave out the GPS-only rows (moving time 0:00, dropped fixes).
+
 ### Added
 
 - Race Day · Track design, step 10: shields in track red with Jog Lock's own mark (warm paper for run-only apps), and the Live Activity as a paper card with the distance left and the run as a red lane, with a red dot and progress ring in the Dynamic Island. The widget carries the Archivo fonts it uses.

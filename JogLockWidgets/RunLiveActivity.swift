@@ -29,7 +29,7 @@ struct RunLiveActivity: Widget {
                     .padding(.leading, 4)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text(context.attributes.startedAt, style: .timer)
+                    RunClock(startedAt: context.attributes.startedAt, endedAt: context.state.endedAt)
                         .font(.subheadline)
                         .monospacedDigit()
                         .multilineTextAlignment(.trailing)
@@ -78,7 +78,25 @@ private func status(_ state: RunActivityAttributes.ContentState) -> String {
     if state.unlocked {
         return "Unlocked"
     }
+    if state.endedAt != nil {
+        return "Finished"
+    }
     return state.paused ? "Paused" : "Running"
+}
+
+/// The run's time: counting while it goes, stopped at the finish, so the card
+/// left on the lock screen afterwards shows how long the run took.
+private struct RunClock: View {
+    let startedAt: Date
+    let endedAt: Date?
+
+    var body: some View {
+        if let endedAt {
+            Text(timerInterval: startedAt...max(startedAt, endedAt), pauseTime: endedAt, countsDown: false)
+        } else {
+            Text(startedAt, style: .timer)
+        }
+    }
 }
 
 /// Red for running, grey when paused, the open lock once unlocked.
@@ -97,7 +115,8 @@ private struct StatusDot: View {
     }
 }
 
-/// "0.57 KM TO TIKTOK", or "TIKTOK IS YOURS" once unlocked.
+/// "0.57 KM TO TIKTOK", "CHECKING YOUR STEPS" while the last of it is
+/// checked, or "TIKTOK IS YOURS" once unlocked.
 private struct Headline: View {
     let app: String
     let state: RunActivityAttributes.ContentState
@@ -108,6 +127,12 @@ private struct Headline: View {
             Text("\(app) is yours")
                 .font(.jlHeading(size * 0.5))
                 .textCase(.uppercase)
+        } else if state.checking {
+            Text("Checking your steps")
+                .font(.jlHeading(size * 0.5))
+                .textCase(.uppercase)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         } else {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(String(format: "%.2f", state.remainingMeters / 1_000))
@@ -136,14 +161,19 @@ struct LockScreenRunView: View {
                 Text("JOG LOCK")
                     .font(.jlHeading(12))
                     .tracking(2)
-                if state.paused && !state.unlocked {
+                if state.endedAt != nil {
+                    Text("· FINISHED")
+                        .font(.jlHeading(12))
+                        .tracking(2)
+                        .foregroundStyle(JL.ink2)
+                } else if state.paused && !state.unlocked {
                     Text("· PAUSED")
                         .font(.jlHeading(12))
                         .tracking(2)
                         .foregroundStyle(JL.redText)
                 }
                 Spacer()
-                Text(startedAt, style: .timer)
+                RunClock(startedAt: startedAt, endedAt: state.endedAt)
                     .font(.subheadline.weight(.semibold))
                     .monospacedDigit()
                     .multilineTextAlignment(.trailing)

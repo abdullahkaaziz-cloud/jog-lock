@@ -285,6 +285,7 @@ struct RunDetailView: View {
     @State private var comparing = false
     @State private var sharing = false
     @State private var confirmDelete = false
+    @State private var panelUnderBar = false
 
     init(run: RunSummary) {
         _run = State(initialValue: run)
@@ -299,7 +300,16 @@ struct RunDetailView: View {
                     .padding(.top, -40)
             }
         }
+        // The panel starts 320 pt down; past about 200 it reaches the top bar.
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top > 200
+        } action: { _, under in
+            panelUnderBar = under
+        }
         .ignoresSafeArea(edges: .top)
+        .overlay(alignment: .top) {
+            topBar
+        }
         .scrollIndicators(.hidden)
         .background(JL.paper.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
@@ -357,34 +367,46 @@ struct RunDetailView: View {
             } else {
                 RouteMap(segments: segments, interactive: false)
             }
-            HStack {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.left")
-                }
-                Spacer()
-                Menu {
-                    Button {
-                        comparing = true
-                    } label: {
-                        Label("Compare and notes", systemImage: "ruler")
-                    }
-                    Button(role: .destructive) {
-                        confirmDelete = true
-                    } label: {
-                        Label("Delete run", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                }
-            }
-            .buttonStyle(JLRoundButtonStyle(fill: JL.card))
-            .menuStyle(.button)
-            .shadow(color: JL.ink.opacity(0.15), radius: 8, y: 3)
-            .padding(.horizontal, 20)
-            .padding(.top, 62)
         }
+    }
+
+    /// Back and the menu, kept below the status bar. Once the panel scrolls up
+    /// to them they get a paper backing, so its text doesn't run into the clock.
+    private var topBar: some View {
+        HStack {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+            }
+            Spacer()
+            Menu {
+                Button {
+                    comparing = true
+                } label: {
+                    Label("Compare and notes", systemImage: "ruler")
+                }
+                Button(role: .destructive) {
+                    confirmDelete = true
+                } label: {
+                    Label("Delete run", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+            }
+        }
+        .buttonStyle(JLRoundButtonStyle(fill: JL.card))
+        .menuStyle(.button)
+        .shadow(color: JL.ink.opacity(panelUnderBar ? 0 : 0.15), radius: 8, y: 3)
+        .padding(.horizontal, 20)
+        .padding(.top, 6)
+        .padding(.bottom, 8)
+        .background {
+            JL.paper
+                .ignoresSafeArea(edges: .top)
+                .opacity(panelUnderBar ? 1 : 0)
+        }
+        .animation(.easeOut(duration: 0.15), value: panelUnderBar)
     }
 
     // MARK: - Panel
@@ -570,7 +592,9 @@ struct RunDetailView: View {
     private var details: some View {
         DisclosureGroup {
             VStack(spacing: 8) {
-                row("Moving time", Format.duration(run.movingSeconds))
+                if run.mode != .treadmill {
+                    row("Moving time", Format.duration(run.movingSeconds))
+                }
                 row("Target", "\(Format.km(run.targetKm)) km")
                 if let at = run.countedTargetAt {
                     row("Target hit (counted)", "after " + Format.duration(at.timeIntervalSince(run.startedAt)))
@@ -581,7 +605,9 @@ struct RunDetailView: View {
                 if let trueKm = run.trueKm {
                     row("True distance", "\(Format.km(trueKm)) km · \(Format.percent(meters, versus: trueKm * 1_000))")
                 }
-                row("Dropped fixes", droppedText)
+                if run.mode != .treadmill {
+                    row("Dropped fixes", droppedText)
+                }
                 row("Phone", "\(run.device), iOS \(run.os)")
                 row("App", run.appVersion)
             }

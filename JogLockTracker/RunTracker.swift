@@ -176,7 +176,7 @@ final class RunTracker: NSObject, ObservableObject {
         AppLock.shared.credit(run: id, countedMeters: gateTotals.countedMeters, at: end, finished: true)
         liveActivity.end(final: RunActivityAttributes.ContentState(
             meters: gateTotals.countedMeters, targetMeters: runTargetKm * 1000,
-            unlocked: countedTargetReached, paused: false))
+            unlocked: countedTargetReached, paused: false, endedAt: end))
         logEvent("stop", totals: true)
         writer?.close()
         writer = nil

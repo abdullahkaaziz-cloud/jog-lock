@@ -177,17 +177,23 @@ struct LiveRunView: View {
         }
     }
 
-    /// "TikTok +4 at the finish", on the start line.
+    /// "[icons] +4 at the finish", on the start line. Icons only: iOS draws an
+    /// app's name in its own size and colour, which can't be read on ink.
+    @ViewBuilder
     private var finishPill: some View {
+        let picked = ChosenToken.all(lock.selection).count
+        let iconsShown = min(picked, 3)
+        let named = lock.hasPickedApps ? 0 : min(lock.websites.count, 1)
+        let more = picked - iconsShown + lock.websites.count - named
         HStack(spacing: 6) {
             if lock.hasPickedApps {
-                AppTiles(selection: lock.selection, size: 22, border: JL.ink, limit: 1)
+                AppTiles(selection: lock.selection, size: 22, border: JL.ink, limit: iconsShown)
+            } else if let site = lock.websites.first {
+                Text(site)
             }
-            HStack(spacing: 0) {
-                AppNames(selection: lock.selection, websites: lock.websites, shown: 1)
-                Text(" at the finish")
-            }
+            Text(more > 0 ? "+\(more) at the finish" : "at the finish")
         }
+        .lineLimit(1)
         .font(.caption.weight(.bold))
         .foregroundStyle(JL.paper)
         .padding(.leading, lock.hasPickedApps ? 4 : 12)
@@ -201,7 +207,7 @@ struct LiveRunView: View {
         let unlocked = tracker.countedTargetReached
         VStack(spacing: 18) {
             VStack(spacing: 2) {
-                Text(unlocked ? "Unlocked" : lockCounts ? "To unlock" : "To go")
+                Text(centerLabel(unlocked: unlocked))
                     .font(.footnote.weight(.heavy))
                     .tracking(1.3)
                     .textCase(.uppercase)
@@ -218,6 +224,16 @@ struct LiveRunView: View {
         .foregroundStyle(unlocked ? JL.paper : JL.ink)
         .lineLimit(1)
         .minimumScaleFactor(0.5)
+    }
+
+    /// Over the big number. At 0.00 the last stretch can still be waiting up to
+    /// a minute for the step check (ADR-0003): say so, as the apps aren't open yet.
+    private func centerLabel(unlocked: Bool) -> String {
+        if unlocked {
+            return "Unlocked"
+        }
+        guard lockCounts else { return "To go" }
+        return remainingMeters <= 0 ? "Checking your steps" : "To unlock"
     }
 
     @ViewBuilder

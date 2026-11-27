@@ -14,6 +14,7 @@ struct RunActivityAttributes: ActivityAttributes {
         var targetMeters: Double
         var unlocked: Bool
         var paused: Bool
+        var endedAt: Date? = nil    // set at the finish: the clock stops there
 
         var remainingMeters: Double {
             max(0, targetMeters - meters)
@@ -21,6 +22,12 @@ struct RunActivityAttributes: ActivityAttributes {
 
         var progress: Double {
             targetMeters > 0 ? min(1, meters / targetMeters) : 0
+        }
+
+        /// The distance is all there but the last of it is still being checked
+        /// against the steps (up to a minute, ADR-0003), so not unlocked yet.
+        var checking: Bool {
+            !unlocked && endedAt == nil && targetMeters > 0 && remainingMeters <= 0
         }
     }
 
