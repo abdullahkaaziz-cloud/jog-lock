@@ -84,6 +84,10 @@ final class RunTracker: NSObject, ObservableObject {
     private var intervalVariant = 0
     private var intervalTask: Task<Void, Never>?
     private var niceTryDetector = NiceTryDetector()
+    private var pepTalks = PepTalkPlanner()
+    private var pepTalkSeed = 0
+    private var pepTalkCount: [PepMoment: Int] = [:]
+    private var pepTalkTask: Task<Void, Never>?
     private let speaker = VoiceSpeaker()
     private let liveActivity = RunActivityController()
     private var treadmill: TreadmillCounter?
@@ -134,6 +138,7 @@ final class RunTracker: NSObject, ObservableObject {
         guard !isStopping else { return }
         isStopping = true
         stopIntervals()
+        stopPepTalks()
         AppLock.shared.runEnded(id)
         updatesTask?.cancel()
         updatesTask = nil
@@ -261,6 +266,9 @@ final class RunTracker: NSObject, ObservableObject {
         route = []
         coach = VoiceCoachPlanner()
         niceTryDetector = NiceTryDetector()
+        pepTalks = PepTalkPlanner()
+        pepTalkSeed = Int.random(in: 0..<6)
+        pepTalkCount = [:]
         splits = KmSplits()
         lastKmSeconds = nil
         niceTry = nil
@@ -291,6 +299,7 @@ final class RunTracker: NSObject, ObservableObject {
         startMotion(from: now)
         liveActivity.start(app: AppSettings.shared.nemesis, startedAt: now, targetMeters: runTargetKm * 1000)
         startIntervals(at: now)
+        startPepTalks()
         AppLock.shared.runStarted(id)
     }
 
@@ -465,10 +474,59 @@ final class RunTracker: NSObject, ObservableObject {
         }
         let live = gateTotals.countedMeters + gateTotals.pendingMeters
         if let cue = coach.cue(meters: live, target: runTargetKm * 1000, unlocked: countedTargetReached) {
-            say(cue)
+            // With the last-100 m pep talk on, it takes the "nearly there" moment.
+            if !(cue == .almostThere && AppSettings.shared.pepLastStretch) {
+                say(cue)
+            }
         }
+        checkPepTalk(at: time)
         liveActivity.update(meters: live, targetMeters: runTargetKm * 1000,
                             unlocked: countedTargetReached, paused: status == .paused)
+    }
+
+    // MARK: - Pep talks
+
+    /// Checked on every update and every 3 seconds besides: a stop sends no updates.
+    private func startPepTalks() {
+        stopPepTalks()
+        pepTalkTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3))
+                guard let self else { return }
+                self.checkPepTalk(at: Date())
+            }
+        }
+    }
+
+    private func stopPepTalks() {
+        pepTalkTask?.cancel()
+        pepTalkTask = nil
+    }
+
+    /// The last 100 m, slowing right down, stopping: each with its switch in
+    /// Settings, and only while the coach talks.
+    private func checkPepTalk(at time: Date) {
+        guard runID != nil, !isStopping, status == .tracking || status == .paused else { return }
+        let settings = AppSettings.shared
+        let live = gateTotals.countedMeters + gateTotals.pendingMeters
+        guard let moment = pepTalks.moment(at: time.timeIntervalSince1970, meters: live, pace: runPace(at: time),
+                                           target: runTargetKm * 1000,
+                                           choices: settings.voiceOn ? settings.pepChoices : .none,
+                                           slowingAllowed: intervalCoach == nil) else { return }
+        let line = PepTalkLines.line(moment, index: pepTalkSeed + pepTalkCount[moment, default: 0])
+        pepTalkCount[moment, default: 0] += 1
+        logEvent("pepTalk", detail: moment.rawValue)
+        speaker.speak(line, style: settings.voiceStyle)
+    }
+
+    /// The run's own pace so far, m/s: GPS distance over moving time outdoors,
+    /// distance over time on a treadmill.
+    private func runPace(at time: Date) -> Double {
+        if runMode == .treadmill {
+            let elapsed = time.timeIntervalSince(startedAt ?? time)
+            return elapsed > 0 ? (gateTotals.countedMeters + gateTotals.pendingMeters) / elapsed : 0
+        }
+        return snapshot.movingSeconds > 0 ? snapshot.cleanMeters / snapshot.movingSeconds : 0
     }
 
     /// The clock km splits are timed on: GPS moving time outdoors, so stops
@@ -588,6 +646,7 @@ final class RunTracker: NSObject, ObservableObject {
             status = .tracking
         }
         startMotion(from: runStart)
+        startPepTalks()
         liveActivity.reattach()
     }
 

@@ -4,16 +4,9 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ## [Unreleased]
 
-### Fixed
-
-- After the first runs on two iPhones (27 Nov): the Live Activity's clock stops at the finish and says Finished, instead of counting on for the 15 minutes the card stays on the lock screen.
-- The live run's "at the finish" pill shows the apps' icons and how many more, not the app's name: iOS drew the name in its own size and black, unreadable on ink, and stretched the pill across the screen.
-- When distance is all there but the last stretch is still being checked against the steps (up to a minute, ADR-0003), the run screen and the Live Activity say "Checking your steps" instead of "0.00 km to unlock".
-- A run's details keep back and the menu below the status bar, with a paper backing once the panel scrolls up to them, so the text no longer runs into the clock.
-- Treadmill runs' details leave out the GPS-only rows (moving time 0:00, dropped fixes).
-
 ### Added
 
+- Pep talks, each with its own switch in Settings (off until switched on): a line in the last 100 m, when the runner slows right down, and when they stop. Eighteen lines, six for each moment: public domain words from battles, speeches and poems, or Jog Lock's own lines for the big moments of fight and war films (film dialogue is copyrighted, so none is quoted). They need the voice coach on, skip slowing on 5K plan runs, and end once the run's distance is covered. Rules in `PepTalkPlanner`, with tests; checked against the 27 Nov park run (one slowing talk at the hill, the last-100 m talk at 2.40 km).
 - Race Day · Track design, step 10: shields in track red with Jog Lock's own mark (warm paper for run-only apps), and the Live Activity as a paper card with the distance left and the run as a red lane, with a red dot and progress ring in the Dynamic Island. The widget carries the Archivo fonts it uses.
 - Race Day · Track design, step 9: onboarding on first launch only: what Jog Lock does, which apps to lock, how far to run (or the 5K plan) and rest days, the permissions and why each is needed, and a summary before LOCK MY APPS. Nothing locks until then. People who already use Jog Lock skip it.
 - Race Day · Track design, step 8: the plan as cards to pick from (Every day, Each week, 5K plan) with a big distance, rest days and Save; the 5K plan's week with this week's three runs, what's coming and Repeat week; Settings in groups (you, voice coach, running, lock, help) with privacy and testing notes on their own screens; and Shoes with the pair you're wearing, how far it has left, and the other pairs.
@@ -70,6 +63,11 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ### Fixed
 
+- After the first runs on two iPhones (27 Nov): the Live Activity's clock stops at the finish and says Finished, instead of counting on for the 15 minutes the card stays on the lock screen.
+- The live run's "at the finish" pill shows the apps' icons and how many more, not the app's name: iOS drew the name in its own size and black, unreadable on ink, and stretched the pill across the screen.
+- When distance is all there but the last stretch is still being checked against the steps (up to a minute, ADR-0003), the run screen and the Live Activity say "Checking your steps" instead of "0.00 km to unlock".
+- A run's details keep back and the menu below the status bar, with a paper backing once the panel scrolls up to them, so the text no longer runs into the clock.
+- Treadmill runs' details leave out the GPS-only rows (moving time 0:00, dropped fixes).
 - The Time tile no longer resets to 0:00 when a run is saved. It shows the finished run's length.
 - Differences that round to zero show as +0.0%, not -0.0%.
 

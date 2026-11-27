@@ -60,6 +60,7 @@ It needs a paid Apple Developer team, because free Personal Teams can't use Fami
 
 - **Maps.** The live screen shows your route as you run. Each run's details open with its route, and the map button on the Runs screen shows everywhere you've run.
 - **Voice coach.** Every 500 m, at halfway, near the end and at the unlock, a voice line like "TikTok is getting closer. 1.8 kilometres to go." Pick the app you're running for and a voice (Chipmunk, Robot, Movie trailer, Normal) in Settings (gear icon). Music ducks while it talks.
+- **Pep talks.** Switched on one by one in Settings → Pep talks: in the last 100 m, when you slow right down (the last 30 s under 75% of the run's own pace, after 3 minutes; not on 5K plan runs), and when you stop for 15 s. Eighteen lines from old battles, speeches and poems (Shakespeare's Henry V, Kipling, Tennyson, Bastogne) and the big moments of fight and war films told in new words. Once per slow patch or stop, 2 minutes apart, and none once the run's distance is covered. Rules in `PepTalkPlanner`, with tests.
 - **Nice try.** When the step check throws out distance (car, bike, or GPS distance without the steps), a "Nice try." card appears and the coach says so. The card can be shared.
 - **Lock-screen countdown.** During a run the lock screen and Dynamic Island show "0.8 km to TikTok", a progress bar and the time. It stays on the lock screen for 15 minutes after the run.
 - **Share card.** After a run, "Share this run" makes a story-sized image (1080 × 1920): your route as line art, the distance, time and pace.

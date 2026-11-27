@@ -2,9 +2,9 @@
 //  SettingsView.swift
 //  JogLockTracker
 //
-//  The Settings tab: you, the voice coach, running (shoes and how runs
-//  start), the lock (making it unbreakable, notifications), and help
-//  (diagnostics, privacy, testing against Strava).
+//  The Settings tab: you, the voice coach and its pep talks, running (shoes
+//  and how runs start), the lock (making it unbreakable, notifications), and
+//  help (diagnostics, privacy, testing against Strava).
 //
 
 import JogLockCore
@@ -21,6 +21,7 @@ struct SettingsView: View {
     @State private var diagnostics: URL?
     @State private var speaker = VoiceSpeaker()
     @State private var sample = 0
+    @State private var pepSample = Int.random(in: 0..<18)
     @State private var notificationsOn: Bool?
 
     var body: some View {
@@ -59,21 +60,14 @@ struct SettingsView: View {
                                 }
                             }
                         }
-                        Button {
+                        sampleButton {
                             let line = VoiceLines.text(for: .progress(meters: 500), app: settings.nemesis,
                                                        remainingMeters: 1_800, variant: sample)
                             speaker.speak(line, style: settings.voiceStyle)
                             sample += 1
-                        } label: {
-                            Label("Play a sample", systemImage: "play.fill")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(JL.redText)
-                                .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-                                .padding(.horizontal, 16)
-                                .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
                     }
+                    pepTalks
                     group("Running") {
                         NavigationLink {
                             ShoesView()
@@ -147,6 +141,53 @@ struct SettingsView: View {
                 notificationsOn = status == .authorized || status == .provisional || status == .ephemeral
             }
         }
+    }
+
+    /// A line from a battle, a speech or a fight film at the moments that
+    /// count, each switched on here. They need the coach on.
+    private var pepTalks: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            group("Pep talks") {
+                line("In the last 100 m", isLast: false) {
+                    Toggle("In the last 100 m", isOn: $settings.pepLastStretch)
+                        .labelsHidden()
+                        .tint(JL.red)
+                }
+                line("When I slow down", note: "Not on 5K plan runs, where walking is part of the plan", isLast: false) {
+                    Toggle("When I slow down", isOn: $settings.pepSlowing)
+                        .labelsHidden()
+                        .tint(JL.red)
+                }
+                line("When I stop", isLast: false) {
+                    Toggle("When I stop", isOn: $settings.pepStopped)
+                        .labelsHidden()
+                        .tint(JL.red)
+                }
+                sampleButton {
+                    speaker.speak(PepTalkLines.sample(index: pepSample), style: settings.voiceStyle)
+                    pepSample += 1
+                }
+            }
+            .disabled(!settings.voiceOn)
+            .opacity(settings.voiceOn ? 1 : 0.5)
+            Text(settings.voiceOn
+                 ? "Lines from old battles, speeches and poems, and the big moments of fight and war films. They stop once you've run the day's distance."
+                 : "Turn on Talk to me while I run to hear pep talks.")
+                .font(.footnote)
+                .foregroundStyle(JL.ink2)
+        }
+    }
+
+    private func sampleButton(_ play: @escaping () -> Void) -> some View {
+        Button(action: play) {
+            Label("Play a sample", systemImage: "play.fill")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(JL.redText)
+                .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                .padding(.horizontal, 16)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var shoeText: String {
